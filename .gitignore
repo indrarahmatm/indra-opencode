@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.env
+.venv/
+venv/
+*.db
+*.log
+.DS_Store
+*.egg-info/
+.pytest_cache/
+vector_store/
+*.faiss
+*.json
+network-monitor/__pycache__/
+rag-app/__pycache__/
+vendor-research-app/__pycache__/
