@@ -18,12 +18,14 @@ units_lock = threading.Lock()
 TELEGRAM_TOKEN = "8627954180:AAHzpqbqsuHa1mCMmxXGQTLsE86CWlR0lLI"
 TELEGRAM_CHAT_ID = "6054204698"
 
+TELEGRAM_ENABLED = True
+
 ANOMALY_THRESHOLDS = {
     "Engine RPM": {"min": 1500, "max": 2100},
     "Engine Temp": {"min": 250, "max": 400},
     "Oil Pressure": {"min": 150, "max": 500},
     "Fuel Rate": {"min": 10, "max": 40},
-    "Exhaust Temp": {"min": 350, "max": 550},
+    "Exhaust Temp": {"min": 350, "max": 750},
     "Turbo RPM": {"min": 20000, "max": 50000},
 }
 
@@ -31,6 +33,8 @@ last_alert_time = {}
 ALERT_COOLDOWN = 60
 
 def send_telegram(message):
+    if not TELEGRAM_ENABLED:
+        return
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     data = urllib.parse.urlencode({"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "Markdown"}).encode()
     try:
