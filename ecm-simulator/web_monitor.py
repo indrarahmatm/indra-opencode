@@ -43,9 +43,7 @@ def check_anomaly(unit, param, value):
     if param not in ANOMALY_THRESHOLDS:
         return False
     thresh = ANOMALY_THRESHOLDS[param]
-    if unit == "SM01":
-        return value < thresh["min"] or value > thresh["max"]
-    return False
+    return value < thresh["min"] or value > thresh["max"]
 
 def send_anomaly_alert(unit, param, value):
     key = f"{unit}:{param}"
