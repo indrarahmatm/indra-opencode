@@ -3,6 +3,9 @@ import can
 import threading
 import json
 import time
+import urllib.request
+import urllib.parse
+import os
 from flask import Flask, render_template_string
 from flask_socketio import SocketIO, emit
 
@@ -11,6 +14,46 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 
 units_data = {}
 units_lock = threading.Lock()
+
+TELEGRAM_TOKEN = "8627954180:AAHzpqbqsuHa1mCMmxXGQTLsE86CWlR0lLI"
+TELEGRAM_CHAT_ID = "6054204698"
+
+ANOMALY_THRESHOLDS = {
+    "Engine RPM": {"min": 1600, "max": 2000},
+    "Engine Temp": {"min": 273, "max": 373},
+    "Oil Pressure": {"min": 200, "max": 450},
+    "Fuel Rate": {"min": 15, "max": 35},
+    "Exhaust Temp": {"min": 400, "max": 500},
+    "Turbo RPM": {"min": 25000, "max": 45000},
+}
+
+last_alert_time = {}
+ALERT_COOLDOWN = 60
+
+def send_telegram(message):
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    data = urllib.parse.urlencode({"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "Markdown"}).encode()
+    try:
+        req = urllib.request.Request(url, data=data, method="POST")
+        urllib.request.urlopen(req, timeout=10)
+    except Exception as e:
+        print(f"Telegram error: {e}")
+
+def check_anomaly(unit, param, value):
+    if param not in ANOMALY_THRESHOLDS:
+        return False
+    thresh = ANOMALY_THRESHOLDS[param]
+    return value < thresh["min"] or value > thresh["max"]
+
+def send_anomaly_alert(unit, param, value):
+    key = f"{unit}:{param}"
+    now = time.time()
+    if key in last_alert_time and now - last_alert_time[key] < ALERT_COOLDOWN:
+        return
+    last_alert_time[key] = now
+    
+    message = f"⚠️ *Health Report*\n\n*Unit:* {unit}\n*Parameter:* {param}\n*Value:* {value}"
+    send_telegram(message)
 
 PGN_NAMES = {
     0xF004: "Engine RPM",
@@ -59,6 +102,9 @@ def listen_can():
                         units_data[unit_name] = {}
                     units_data[unit_name][PGN_NAMES[pgn]] = value
                     units_data[unit_name]["timestamp"] = time.time()
+                
+                if check_anomaly(unit_name, PGN_NAMES[pgn], value):
+                    send_anomaly_alert(unit_name, PGN_NAMES[pgn], value)
                 
                 socketio.emit("can_data", {
                     "unit": unit_name,
