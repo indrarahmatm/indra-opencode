@@ -1,0 +1,15 @@
+[Unit]
+Description=Wirtgen ECM Simulator - All Units
+After=network.target
+
+[Service]
+Type=simple
+User=indra
+WorkingDirectory=/home/indra/indra-projects/ecm-simulator
+ExecStart=/bin/bash -c 'cd /home/indra/indra-projects/ecm-simulator && /usr/bin/python3 wirtgen-ecm-simulator.py --unit SM01 --interval 1'
+StandardOutput=journal
+StandardError=journal
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

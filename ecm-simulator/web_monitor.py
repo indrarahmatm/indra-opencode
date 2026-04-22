@@ -6,7 +6,7 @@ import time
 import urllib.request
 import urllib.parse
 import os
-from flask import Flask, render_template_string
+from flask import Flask, render_template_string, send_from_directory
 from flask_socketio import SocketIO, emit
 
 app = Flask(__name__)
@@ -120,6 +120,8 @@ def listen_can():
         except Exception as e:
             pass
 
+LOGO_URL = "/static/logo_pt_psp.png"
+
 HTML = """
 <!DOCTYPE html>
 <html>
@@ -128,6 +130,7 @@ HTML = """
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; background: #1a1a2e; color: #eee; }
+        .logo { display: block; margin: 0 auto 20px; max-width: 200px; }
         h1 { text-align: center; color: #00d4ff; }
         .units { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
         .unit-card { 
@@ -149,6 +152,7 @@ HTML = """
     </style>
 </head>
 <body>
+    <img src="/static/logo_pt_psp.png" alt="Logo" class="logo">
     <h1>ECM Simulator Monitor</h1>
     <div class="units" id="units"></div>
     <script>
@@ -189,6 +193,10 @@ HTML = """
 </body>
 </html>
 """
+
+@app.route("/static/<path:filename>")
+def static_files(filename):
+    return send_from_directory("static", filename)
 
 @app.route("/")
 def index():
