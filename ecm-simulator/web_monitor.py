@@ -19,12 +19,12 @@ TELEGRAM_TOKEN = "8627954180:AAHzpqbqsuHa1mCMmxXGQTLsE86CWlR0lLI"
 TELEGRAM_CHAT_ID = "6054204698"
 
 ANOMALY_THRESHOLDS = {
-    "Engine RPM": {"min": 1600, "max": 2000},
-    "Engine Temp": {"min": 273, "max": 373},
-    "Oil Pressure": {"min": 200, "max": 450},
-    "Fuel Rate": {"min": 15, "max": 35},
-    "Exhaust Temp": {"min": 400, "max": 500},
-    "Turbo RPM": {"min": 25000, "max": 45000},
+    "Engine RPM": {"min": 1500, "max": 2100},
+    "Engine Temp": {"min": 250, "max": 400},
+    "Oil Pressure": {"min": 150, "max": 500},
+    "Fuel Rate": {"min": 10, "max": 40},
+    "Exhaust Temp": {"min": 350, "max": 550},
+    "Turbo RPM": {"min": 20000, "max": 50000},
 }
 
 last_alert_time = {}
