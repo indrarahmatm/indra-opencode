@@ -67,12 +67,24 @@ def create_engine_data(pgn, value):
 
 class EngineSimulator:
     def __init__(self, unit_name, interface="vcan0"):
-        self.bus = can.interface.Bus(channel=interface, interface="socketcan")
-        self.unit = UNITS[unit_name]
         self.unit_name = unit_name
+        self.interface = interface
+        try:
+            self.bus = can.interface.Bus(channel=interface, interface="socketcan")
+        except can.CanError as e:
+            raise RuntimeError(f"Failed to connect to CAN interface '{interface}': {e}")
+        except Exception as e:
+            raise RuntimeError(f"Unexpected error connecting to CAN interface: {e}")
+        
+        if unit_name not in UNITS:
+            raise ValueError(f"Unknown unit '{unit_name}'. Available: {list(UNITS.keys())}")
+        self.unit = UNITS[unit_name]
 
     def close(self):
-        self.bus.shutdown()
+        try:
+            self.bus.shutdown()
+        except Exception as e:
+            print(f"Warning: Error closing bus: {e}")
 
     def send_pgn(self, pgn, value):
         can_id = build_j1939_can_id(pgn, src_addr=self.unit["addr"])
@@ -81,7 +93,12 @@ class EngineSimulator:
             data=create_engine_data(pgn, value),
             is_extended_id=True,
         )
-        self.bus.send(msg)
+        try:
+            self.bus.send(msg)
+        except can.CanError as e:
+            print(f"Error sending CAN message: {e}")
+        except Exception as e:
+            print(f"Unexpected error sending message: {e}")
 
     def run_cycle(self, anomaly=False):
         base = self.unit
@@ -120,13 +137,26 @@ if __name__ == "__main__":
     parser.add_argument("--anomaly", action="store_true", help="Generate anomaly data")
     args = parser.parse_args()
 
-    sim = EngineSimulator(args.unit, args.interface)
-    print(f"Starting {args.unit} simulator on {args.interface}...")
+    try:
+        sim = EngineSimulator(args.unit, args.interface)
+    except RuntimeError as e:
+        print(f"Error: {e}")
+        exit(1)
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        exit(1)
+
+    print(f"Starting {args.unit} simulator on {args.interface}...", flush=True)
 
     try:
         while True:
-            sim.run_cycle(anomaly=args.anomaly)
+            try:
+                sim.run_cycle(anomaly=args.anomaly)
+            except Exception as e:
+                print(f"Error in cycle: {e}", flush=True)
             time.sleep(args.interval)
     except KeyboardInterrupt:
-        print(f"\nStopping {args.unit}...")
+        print(f"\nStopping {args.unit}...", flush=True)
+    finally:
         sim.close()
+        print("Simulator stopped.", flush=True)
