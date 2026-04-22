@@ -56,7 +56,7 @@ def send_anomaly_alert(unit, param, value):
         return
     last_alert_time[key] = now
     
-    message = f"⚠️ *Health Report*\n\n*Unit:* {unit}\n*Parameter:* {param}\n*Value:* {value}"
+    message = f"⚠️ *Engine Health Report*\n\n*Unit:* {unit}\n*Parameter:* {param}\n*Value:* {value}"
     send_telegram(message)
 
 PGN_NAMES = {
