@@ -130,8 +130,9 @@ HTML = """
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; background: #1a1a2e; color: #eee; }
-        .logo { display: block; margin: 0 auto 20px; max-width: 200px; }
-        h1 { text-align: center; color: #00d4ff; }
+        .logo { height: 50px; vertical-align: middle; margin-right: 15px; }
+        h1 { display: inline-block; text-align: center; color: #00d4ff; vertical-align: middle; }
+        .header { text-align: center; margin-bottom: 30px; }
         .units { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
         .unit-card { 
             background: #16213e; border-radius: 10px; padding: 20px; 
@@ -152,8 +153,10 @@ HTML = """
     </style>
 </head>
 <body>
-    <img src="/static/logo_pt_psp.png" alt="Logo" class="logo">
-    <h1>ECM Simulator Monitor</h1>
+    <div class="header">
+        <img src="/static/logo_pt_psp.png" alt="Logo" class="logo">
+        <h1>ECM Simulator Monitor</h1>
+    </div>
     <div class="units" id="units"></div>
     <script>
         const units = { SM01: {}, SM02: {}, SM03: {} };
