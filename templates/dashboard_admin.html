@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Admin - EntokMart{% endblock %}
+{% block content %}
+<h2 class="mb-4">Dashboard Admin</h2>
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">User ({{ users|length }})</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for u in users %}
+                        <tr>
+                            <td>{{ u.username }}</td>
+                            <td>{{ u.email }}</td>
+                            <td><span class="badge bg-{% if u.role == 'admin' %}danger{% elif u.role == 'peternak' %}success{% else %}secondary{% endif %}">{{ u.role }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Pesanan</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>#ID</th>
+                            <th>Buyer</th>
+                            <th>Total</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for o in orders %}
+                        <tr>
+                            <td>{{ o.id }}</td>
+                            <td>{{ o.buyer.username }}</td>
+                            <td>Rp {{ "{:,}".format(o.total_harga) }}</td>
+                            <td><span class="badge bg-{% if o.status == 'selesai' %}success{% elif o.status == 'dikirim' %}info{% elif o.status == 'diproses' %}warning{% else %}secondary{% endif %}">{{ o.status }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Keranjang - EntokMart{% endblock %}
+{% block content %}
+<h2 class="mb-4">Keranjang Belanja</h2>
+{% if cart_items %}
+<div class="row">
+    <div class="col-md-8">
+        {% for item in cart_items %}
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5>{{ item.product.name }}</h5>
+                        <p class="text-muted mb-1">{{ item.product.jenis }} - {{ item.product.berat_kg }} kg</p>
+                        <small class="text-muted">Peternak: {{ item.product.seller.username }}</small>
+                    </div>
+                    <div class="text-end">
+                        <h5>Rp {{ "{:,}".format(item.subtotal) }}</h5>
+                        <p class="text-muted">{{ item.jumlah }} x Rp {{ "{:,}".format(item.product.harga) }}</p>
+                        <a href="/keranjang/hapus/{{ item.product.id }}" class="btn btn-sm btn-outline-danger">Hapus</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Total</h5>
+            </div>
+            <div class="card-body">
+                <h3 class="text-success">Rp {{ "{:,}".format(total) }}</h3>
+                <a href="/checkout" class="btn btn-entok w-100 mt-3">Checkout</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="text-center py-5">
+    <i class="bi bi-cart-x fs-1 text-muted"></i>
+    <p class="text-muted mt-3">Keranjang kosong</p>
+    <a href="/" class="btn btn-entok">Lihat Katalog</a>
+</div>
+{% endif %}
+{% endblock %}

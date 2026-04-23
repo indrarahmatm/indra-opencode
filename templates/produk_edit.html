@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Edit Produk - EntokMart{% endblock %}
+{% block content %}
+<h2 class="mb-4">Edit Produk</h2>
+<div class="card">
+    <div class="card-body">
+        <form method="POST">
+            <div class="mb-3">
+                <label class="form-label">Nama Entok</label>
+                <input type="text" name="name" class="form-control" value="{{ product.name }}" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Jenis</label>
+                <select name="jenis" class="form-select" required>
+                    <option value="entok muda" {% if product.jenis == 'entok muda' %}selected{% endif %}>Entok Muda (Bibit)</option>
+                    <option value="entok afkir" {% if product.jenis == 'entok afkir' %}selected{% endif %}>Entok Afkir (Dewasa)</option>
+                    <option value="entok培" {% if product.jenis == 'entok培' %}selected{% endif %}>Entok培 (Pandet)</option>
+                </select>
+            </div>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Berat (kg)</label>
+                    <input type="number" name="berat_kg" class="form-control" value="{{ product.berat_kg }}" step="0.1" required>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Harga (Rp)</label>
+                    <input type="number" name="harga" class="form-control" value="{{ product.harga }}" required>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Deskripsi</label>
+                <textarea name="deskripsi" class="form-control" rows="3">{{ product.deskripsi or '' }}</textarea>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">URL Gambar</label>
+                <input type="url" name="image_url" class="form-control" value="{{ product.image_url or '' }}">
+            </div>
+            <button type="submit" class="btn btn-entok">Update</button>
+            <a href="/dashboard-peternak" class="btn btn-outline-secondary ms-2">Batal</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Checkout - EntokMart{% endblock %}
+{% block content %}
+<h2 class="mb-4">Checkout</h2>
+<div class="row">
+    <div class="col-md-7">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Alamat Pengiriman</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="mb-3">
+                        <label class="form-label">Nama Penerima</label>
+                        <input type="text" name="nama_penerima" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Alamat Lengkap</label>
+                        <textarea name="alamat" class="form-control" rows="3" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">No. Telepon</label>
+                        <input type="text" name="telp" class="form-control" required>
+                    </div>
+                    <button type="submit" class="btn btn-entok w-100">Pesan Sekarang</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-5">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Rincian Pesanan</h5>
+            </div>
+            <div class="card-body">
+                <h3 class="text-success">Total: Rp {{ "{:,}".format(total) }}</h3>
+                <p class="text-muted small">Silakan isi alamat untuk melanjutkan pesanan</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

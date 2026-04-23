@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Pesanan Masuk - EntokMart{% endblock %}
+{% block content %}
+<h2 class="mb-4">Pesanan Masuk</h2>
+{% for item in items %}
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="d-flex justify-content-between">
+            <div>
+                <h5>{{ item.nama_product }}</h5>
+                <p class="text-muted mb-1">Pembeli: {{ item.order.buyer.username }}</p>
+                <p class="text-muted small mb-0">Alamat: {{ item.order.alamat }}</p>
+            </div>
+            <div class="text-end">
+                <p>{{ item.jumlah }} x Rp {{ "{:,}".format(item.harga_saat_beli) }}</p>
+                <p class="text-muted">Total: Rp {{ "{:,}".format(item.harga_saat_beli * item.jumlah) }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="card-footer bg-white">
+        <form action="/pesanan/update/{{ item.order.id }}" method="POST" class="d-flex align-items-center">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label class="me-2">Status:</label>
+            <select name="status" class="form-select form-select-sm" style="width: auto;">
+                <option value="pending" {% if item.order.status == 'pending' %}selected{% endif %}>Pending</option>
+                <option value="diproses" {% if item.order.status == 'diproses' %}selected{% endif %}>Diproses</option>
+                <option value="dikirim" {% if item.order.status == 'dikirim' %}selected{% endif %}>Dikirim</option>
+                <option value="selesai" {% if item.order.status == 'selesai' %}selected{% endif %}>Selesai</option>
+            </select>
+            <button type="submit" class="btn btn-sm btn-entok ms-2">Update</button>
+        </form>
+    </div>
+</div>
+{% else %}
+<div class="text-center py-5">
+    <i class="bi bi-inbox fs-1 text-muted"></i>
+    <p class="text-muted mt-3">Belum ada pesanan masuk</p>
+</div>
+{% endfor %}
+{% endblock %}

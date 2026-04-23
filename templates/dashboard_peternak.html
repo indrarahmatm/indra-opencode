@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Dashboard Peternak - EntokMart{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Dashboard Peternak</h2>
+    <a href="/produk/baru" class="btn btn-entok"><i class="bi bi-plus-lg"></i> Tambah Produk</a>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header bg-white">
+        <h5 class="mb-0">Produk Saya</h5>
+    </div>
+    <div class="card-body">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>Nama</th>
+                    <th>Jenis</th>
+                    <th>Berat</th>
+                    <th>Harga</th>
+                    <th>Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in products %}
+                <tr>
+                    <td>{{ p.name }}</td>
+                    <td><span class="badge bg-secondary">{{ p.jenis }}</span></td>
+                    <td>{{ p.berat_kg }} kg</td>
+                    <td>Rp {{ "{:,}".format(p.harga) }}</td>
+                    <td>
+                        <a href="/produk/edit/{{ p.id }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
+                        <a href="/produk/hapus/{{ p.id }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Hapus?')"><i class="bi bi-trash"></i></a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center text-muted">Belum ada produk</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
