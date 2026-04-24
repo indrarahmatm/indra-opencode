@@ -1,7 +1,25 @@
-from flask import render_template, redirect, url_for, request, flash, session
+import re
+from flask import render_template, redirect, url_for, request, flash
 from flask_login import login_user, logout_user, login_required, current_user
 from app import app
 from models import db, User, Product, Order, OrderItem
+
+def sanitize_input(text):
+    if text:
+        return re.sub(r'[<>\'\";]', '', str(text))
+    return text
+
+def validate_username(username):
+    if not username or len(username) < 3 or len(username) > 50:
+        return False
+    return re.match(r'^[a-zA-Z0-9_]+$', username)
+
+def validate_password(password):
+    if not password or len(password) < 6:
+        return False
+    return True
+
+VALID_STATUSES = ['pending', 'diproses', 'dikirim', 'selesai']
 
 @app.route('/')
 def index():
@@ -11,10 +29,22 @@ def index():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
-        username = request.form['username']
-        email = request.form['email']
-        password = request.form['password']
-        role = request.form['role']
+        username = sanitize_input(request.form.get('username', ''))
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+        role = request.form.get('role', 'buyer')
+
+        if not validate_username(username):
+            flash('Username harus 3-50 karakter, hanya huruf/angka/_', 'danger')
+            return redirect(url_for('register'))
+        
+        if not validate_password(password):
+            flash('Password minimal 6 karakter', 'danger')
+            return redirect(url_for('register'))
+
+        if not re.match(r'^[\w.+]+@[\w.]+$', email):
+            flash('Email tidak valid', 'danger')
+            return redirect(url_for('register'))
 
         if User.query.filter((User.username == username) | (User.email == email)).first():
             flash('Username atau email sudah terdaftar', 'danger')
@@ -31,13 +61,18 @@ def register():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        email = request.form['email']
-        password = request.form['password']
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+
+        if not email or not password:
+            flash('Email dan password wajib diisi', 'danger')
+            return render_template('login.html')
+
         user = User.query.filter_by(email=email).first()
 
         if user and user.check_password(password):
-            login_user(user)
-            session.clear()
+            login_user(user, remember=True)
+            flash('Login berhasil', 'success')
             if user.role == 'peternak':
                 return redirect(url_for('dashboard_peternak'))
             elif user.role == 'buyer':

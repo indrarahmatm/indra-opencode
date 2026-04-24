@@ -1,11 +1,14 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="text-center mb-5">
-    <h1 class="display-5 fw-bold">Selamat Datang di EntokMart</h1>
-    <p class="lead text-muted">Marketplace terpercaya untuk beli/jual entok优质</p>
+<div class="hero-section text-center py-5">
+    <div class="py-4">
+        <h1 class="display-4 fw-bold mb-3">Selamat Datang di EntokMart</h1>
+        <p class="lead mb-4">Marketplace terpercaya untuk beli/jual entok优质</p>
+        <a href="/register" class="btn btn-entok btn-lg"><i class="bi bi-shop"></i> Mulai Jual Entok</a>
+    </div>
 </div>
 
-<h3 class="mb-3">Katalog Entok</h3>
+<h3 class="mb-4"><i class="bi bi-archive"></i> Katalog Entok</h3>
 <div class="row">
     {% for p in products %}
     <div class="col-md-3 mb-4">
@@ -14,21 +17,21 @@
             <img src="{{ p.image_url }}" class="card-img-top" alt="{{ p.name }}" style="height: 180px; object-fit: cover;">
             {% else %}
             <div class="bg-light d-flex align-items-center justify-content-center" style="height: 180px;">
-                <i class="bi bi-egg fs-1 text-muted"></i>
+                <i class="bi bi-egg fs-1" style="color: var(--primary);"></i>
             </div>
             {% endif %}
             <div class="card-body">
-                <h5 class="card-title">{{ p.name }}</h5>
-                <p class="card-text small">
-                    <span class="badge bg-secondary">{{ p.jenis }}</span><br>
-                    Berat: {{ p.berat_kg }} kg
+                <h5 class="card-title fw-bold">{{ p.name }}</h5>
+                <p class="card-text small mb-2">
+                    <span class="badge-primary">{{ p.jenis }}</span>
+                    <span class="text-muted"> | {{ p.berat_kg }} kg</span>
                 </p>
-                <h4 class="text-success">Rp {{ "{:,}".format(p.harga) }}</h4>
-                <p class="small text-muted">{{ p.deskripsi[:50] }}...</p>
-                <small class="text-muted">Peternak: {{ p.seller.username }}</small>
+                <h4 class="text-accent fw-bold">Rp {{ "{:,}".format(p.harga) }}</h4>
+                <p class="small text-muted">{{ p.deskripsi[:60] if p.deskripsi else '' }}...</p>
+                <small class="text-muted"><i class="bi bi-person"></i> {{ p.seller.username }}</small>
             </div>
             {% if current_user.is_authenticated and current_user.role == 'buyer' %}
-            <div class="card-footer bg-white">
+            <div class="card-footer bg-white border-0">
                 <form action="/keranjang/tambah/{{ p.id }}" method="POST" class="d-flex">
                     <input type="number" name="jumlah" value="1" min="1" class="form-control form-control-sm" style="width: 70px;">
                     <button class="btn btn-entok btn-sm ms-2"><i class="bi bi-cart-plus"></i> Tambah</button>
@@ -39,9 +42,13 @@
     </div>
     {% else %}
     <div class="col-12 text-center py-5">
-        <i class="bi bi-egg fs-1 text-muted"></i>
-        <p class="text-muted mt-2">Belum ada produk. Daftar sebagai peternak untuk mulai menjual!</p>
+        <i class="bi bi-egg fs-1" style="color: var(--primary);"></i>
+        <p class="text-muted mt-3">Belum ada produk. <a href="/register">Daftar</a> sebagai peternak untuk mulai menjual!</p>
     </div>
     {% endfor %}
+</div>
+
+<div class="text-center py-4 mb-4">
+    <p class="text-muted"><i class="bi bi-shield-check"></i> Pembeli terlindungi | <i class="bi bi-truck"></i> Pengiriman aman</p>
 </div>
 {% endblock %}

@@ -19,7 +19,6 @@
     </div>
     <div class="card-footer bg-white">
         <form action="/pesanan/update/{{ item.order.id }}" method="POST" class="d-flex align-items-center">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <label class="me-2">Status:</label>
             <select name="status" class="form-select form-select-sm" style="width: auto;">
                 <option value="pending" {% if item.order.status == 'pending' %}selected{% endif %}>Pending</option>
