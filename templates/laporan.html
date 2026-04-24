@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Laporan Penjualan - EntokMart{% endblock %}
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-graph-up"></i> Laporan Penjualan</h2>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <h6 class="text-muted mb-2">Total Pesanan</h6>
+                <h2 class="text-entok mb-0">{{ total_pesanan }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <h6 class="text-muted mb-2">Diproses</h6>
+                <h2 class="text-warning mb-0">{{ pesanan_diproses }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <h6 class="text-muted mb-2">Dikirim</h6>
+                <h2 class="text-info mb-0">{{ pesanan_dikirim }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <h6 class="text-muted mb-2">Selesai</h6>
+                <h2 class="text-success mb-0">{{ pesanan_selesai }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header bg-white">
+        <h5 class="mb-0">Total Pendapatan</h5>
+    </div>
+    <div class="card-body">
+        <h3 class="text-entok">Rp {{ "{:,}".format(total_pendapatan) }}</h3>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header bg-white">
+        <h5 class="mb-0">Detail Pesanan</h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Order</th>
+                        <th>Produk</th>
+                        <th>Jumlah</th>
+                        <th>Total</th>
+                        <th>Status</th>
+                        <th>Tanggal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td>#{{ item.order.id }}</td>
+                        <td>{{ item.nama_product }}</td>
+                        <td>{{ item.jumlah }}</td>
+                        <td>Rp {{ "{:,}".format(item.harga_saat_beli * item.jumlah) }}</td>
+                        <td><span class="badge bg-{% if item.order.status == 'selesai' %}success{% elif item.order.status == 'dikirim' %}info{% elif item.order.status == 'diproses' %}warning{% else %}secondary{% endif %}">{{ item.order.status }}</span></td>
+                        <td>{{ item.order.created_at.strftime('%d-%m-%Y') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

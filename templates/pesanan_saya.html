@@ -57,7 +57,11 @@
             </div>
             {% if order.payment_method == 'manual' and order.payment_status == 'pending' %}
             <div class="col-md-6 text-end">
-                <button class="btn btn-entok btn-sm">Upload Bukti Transfer</button>
+                <a href="{{ url_for('bukti_transfer', order_id=order.id) }}" class="btn btn-entok btn-sm">Upload Bukti Transfer</a>
+            </div>
+            {% elif order.transfer_proof_url %}
+            <div class="col-md-6 text-end">
+                <small class="text-success"><i class="bi bi-check-circle"></i> Bukti uploaded</small>
             </div>
             {% endif %}
         </div>

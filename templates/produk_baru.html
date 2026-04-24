@@ -4,7 +4,7 @@
 <h2 class="mb-4">Tambah Produk Entok</h2>
 <div class="card">
     <div class="card-body">
-        <form method="POST">
+        <form method="POST" enctype="multipart/form-data">
             <div class="mb-3">
                 <label class="form-label">Nama Entok</label>
                 <input type="text" name="name" class="form-control" placeholder="Contoh: Entok Manila" required>
@@ -30,6 +30,11 @@
             <div class="mb-3">
                 <label class="form-label">Deskripsi</label>
                 <textarea name="deskripsi" class="form-control" rows="3" placeholder="Kondisi, kesehatan, dll"></textarea>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Gambar (opsional)</label>
+                <input type="file" name="image" class="form-control" accept="image/*">
+                <div class="form-text">Format: JPG, PNG, GIF (max 16MB)</div>
             </div>
             <div class="mb-3">
                 <label class="form-label">URL Gambar (opsional)</label>

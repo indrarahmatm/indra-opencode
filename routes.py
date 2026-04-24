@@ -1,6 +1,9 @@
 import re
-from flask import render_template, redirect, url_for, request, flash
+import os
+from datetime import datetime
+from flask import render_template, redirect, url_for, request, flash, send_from_directory
 from flask_login import login_user, logout_user, login_required, current_user
+from werkzeug.utils import secure_filename
 from app import app
 from models import db, User, Product, Order, OrderItem
 
@@ -20,6 +23,9 @@ def validate_password(password):
     return True
 
 VALID_STATUSES = ['pending', 'diproses', 'dikirim', 'selesai']
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
 @app.route('/')
 def index():
@@ -129,7 +135,15 @@ def produk_baru():
             berat_kg = float(request.form['berat_kg'])
             harga = int(request.form['harga'])
             deskripsi = request.form['deskripsi'].strip()
+            
             image_url = request.form.get('image_url', '').strip()
+            file = request.files.get('image')
+            if file and file.filename and allowed_file(file.filename):
+                ext = file.filename.rsplit('.', 1)[1].lower()
+                filename = f'produk_{current_user.id}_{name}_{int(datetime.utcnow().timestamp())}.{ext}'
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(filepath)
+                image_url = f'/static/uploads/{filename}'
 
             if not name or len(name) > 150:
                 flash('Nama produk tidak valid', 'danger')
@@ -168,7 +182,16 @@ def produk_edit(id):
             product.berat_kg = float(request.form['berat_kg'])
             product.harga = int(request.form['harga'])
             product.deskripsi = request.form['deskripsi'].strip()
-            product.image_url = request.form.get('image_url', '').strip()
+            
+            file = request.files.get('image')
+            if file and file.filename and allowed_file(file.filename):
+                ext = file.filename.rsplit('.', 1)[1].lower()
+                filename = f'produk_{product.id}_{int(datetime.utcnow().timestamp())}.{ext}'
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(filepath)
+                product.image_url = f'/static/uploads/{filename}'
+            else:
+                product.image_url = request.form.get('image_url', '').strip()
 
             if product.berat_kg <= 0 or product.berat_kg > 50 or product.harga <= 0:
                 flash('Input tidak valid', 'danger')
@@ -307,6 +330,38 @@ def pesanan_saya():
     orders = Order.query.filter_by(buyer_id=current_user.id).order_by(Order.created_at.desc()).all()
     return render_template('pesanan_saya.html', orders=orders)
 
+@app.route('/bukti-transfer/<int:order_id>', methods=['GET', 'POST'])
+@login_required
+def bukti_transfer(order_id):
+    if current_user.role != 'buyer':
+        return redirect(url_for('index'))
+    
+    order = Order.query.get_or_404(order_id)
+    if order.buyer_id != current_user.id:
+        flash('Akses ditolak', 'danger')
+        return redirect(url_for('pesanan_saya'))
+    
+    if order.payment_method != 'manual':
+        flash('Metode pembayaran bukan transfer manual', 'warning')
+        return redirect(url_for('pesanan_saya'))
+    
+    if request.method == 'POST':
+        file = request.files.get('bukti')
+        if file and file.filename and allowed_file(file.filename):
+            ext = file.filename.rsplit('.', 1)[1].lower()
+            filename = f'bukti_{order.id}_{current_user.id}.{ext}'
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(filepath)
+            order.transfer_proof_url = f'/static/uploads/{filename}'
+            order.payment_status = 'pending'
+            db.session.commit()
+            flash('Bukti transfer berhasil diupload', 'success')
+            return redirect(url_for('pesanan_saya'))
+        else:
+            flash('File tidak valid atau kosong', 'danger')
+    
+    return render_template('bukti_transfer.html', order=order)
+
 @app.route('/pesanan')
 @login_required
 def pesanan():
@@ -314,6 +369,28 @@ def pesanan():
         return redirect(url_for('index'))
     items = OrderItem.query.filter_by(nama_peternak=current_user.username).all()
     return render_template('pesanan.html', items=items)
+
+@app.route('/laporan')
+@login_required
+def laporan():
+    if current_user.role != 'peternak':
+        return redirect(url_for('index'))
+    
+    items = OrderItem.query.filter_by(nama_peternak=current_user.username).all()
+    
+    total_pesanan = len(items)
+    total_pendapatan = sum(item.harga_saat_beli * item.jumlah for item in items)
+    pesanan_selesai = [item for item in items if item.order.status == 'selesai']
+    pesanan_dikirim = [item for item in items if item.order.status == 'dikirim']
+    pesanan_diproses = [item for item in items if item.order.status in ['pending', 'diproses']]
+    
+    return render_template('laporan.html', 
+                       total_pesanan=total_pesanan,
+                       total_pendapatan=total_pendapatan,
+                       pesanan_selesai=len(pesanan_selesai),
+                       pesanan_dikirim=len(pesanan_dikirim),
+                       pesanan_diproses=len(pesanan_diproses),
+                       items=items)
 
 @app.route('/pesanan/update/<int:id>', methods=['POST'])
 @login_required
@@ -340,6 +417,19 @@ def pesanan_update(id):
     db.session.commit()
     flash('Pesanan diupdate', 'success')
     return redirect(url_for('pesanan'))
+
+@app.route('/pesanan/bukti/<int:order_id>')
+@login_required
+def lihat_bukti_transfer(order_id):
+    if current_user.role != 'peternak':
+        return redirect(url_for('index'))
+    
+    order = Order.query.get_or_404(order_id)
+    if not order.transfer_proof_url:
+        flash('Bukti transfer belum ada', 'warning')
+        return redirect(url_for('pesanan'))
+    
+    return render_template('lihat_bukti.html', order=order)
 
 @app.route('/admin')
 @login_required
