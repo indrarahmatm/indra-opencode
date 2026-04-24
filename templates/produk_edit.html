@@ -36,14 +36,29 @@
                 <textarea name="deskripsi" class="form-control" rows="3">{{ product.deskripsi or '' }}</textarea>
             </div>
             <div class="mb-3">
-                <label class="form-label">Gambar</label>
+                <label class="form-label">Gambar Utama</label>
                 {% if product.image_url %}
                 <div class="mb-2">
                     <img src="{{ product.image_url }}" class="img-thumbnail" style="max-height: 150px;">
                 </div>
                 {% endif %}
                 <input type="file" name="image" class="form-control" accept="image/*">
-                <div class="form-text">Format: JPG, PNG, GIF (max 16MB). Kosongkan jika tidak diganti.</div>
+                <div class="form-text">Format: JPG, PNG, GIF (max 16MB)</div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Gallery Gambar</label>
+                {% if product.images %}
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                    {% for img in product.images %}
+                    <div class="position-relative">
+                        <img src="{{ img.image_url }}" class="img-thumbnail" style="height: 80px;">
+                        <span class="position-absolute top-0 start-100 translate-middle badge bg-primary">{{ loop.index }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                <input type="file" name="images" class="form-control" accept="image/*" multiple>
+                <div class="form-text">Tambah lebih banyak gambar (max 16MB per file)</div>
             </div>
             <div class="mb-3">
                 <label class="form-label">URL Gambar</label>

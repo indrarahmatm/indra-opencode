@@ -119,8 +119,10 @@
                             <li class="nav-item"><a class="nav-link" href="/keranjang">Keranjang</a></li>
                             <li class="nav-item"><a class="nav-link" href="/wishlist">Wishlist</a></li>
                             <li class="nav-item"><a class="nav-link" href="/pesanan-saya">Pesanan Saya</a></li>
-                        {% else %}
+                            <li class="nav-item"><a class="nav-link" href="/chat">Chat CS</a></li>
+                        {% elif current_user.role == 'admin' %}
                             <li class="nav-item"><a class="nav-link" href="/admin">Admin</a></li>
+                            <li class="nav-item"><a class="nav-link" href="/chat">Chat CS</a></li>
                         {% endif %}
                     {% endif %}
                 </ul>

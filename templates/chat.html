@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Live Chat - EntokMart{% endblock %}
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-chat-dots"></i> Hubungi Customer Service</h2>
+
+<div class="card" style="max-width: 700px;">
+    <div class="card-header bg-white">
+        <strong>Chat dengan Admin</strong>
+        <span class="badge bg-success float-end"><i class="bi bi-circle-fill"></i> Online</span>
+    </div>
+    <div class="card-body" style="height: 400px; overflow-y: auto;" id="chatbox">
+        {% for c in chats %}
+        <div class="mb-3 {% if c.is_from_admin %}text-start{% else %}text-end{% endif %}">
+            <div class="d-inline-block p-3 rounded {% if c.is_from_admin %}bg-light{% else %}bg-entok text-white{% endif %}" style="max-width: 80%;">
+                <p class="mb-0">{{ c.pesan }}</p>
+                <small class="{% if c.is_from_admin %}text-muted{% else %}text-white-50{% endif %}">{{ c.created_at.strftime('%H:%M') }}</small>
+            </div>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-5">
+            <i class="bi bi-chat-dots fs-1"></i>
+            <p class="mt-3">Belum ada pesan. Mulai percakapan dengan admin!</p>
+        </div>
+        {% endfor %}
+    </div>
+    <div class="card-footer bg-white">
+        <form action="{{ url_for('chat_kirim') }}" method="POST" class="d-flex gap-2">
+            <input type="text" name="pesan" class="form-control" placeholder="Ketik pesan..." required>
+            <button type="submit" class="btn btn-entok"><i class="bi bi-send"></i></button>
+        </form>
+    </div>
+</div>
+
+<script>
+setInterval(() => location.reload(), 5000);
+</script>
+{% endblock %}

@@ -43,13 +43,34 @@
     {% for p in products %}
     <div class="col-md-3 mb-4">
         <div class="card card-produk h-100">
-            {% if p.image_url %}
-            <img src="{{ p.image_url }}" class="card-img-top" alt="{{ p.name }}" style="height: 180px; object-fit: cover;">
-            {% else %}
-            <div class="bg-light d-flex align-items-center justify-content-center" style="height: 180px;">
-                <i class="bi bi-egg fs-1" style="color: var(--primary);"></i>
+            <div id="carousel{{ p.id }}" class="carousel slide" data-bs-ride="carousel">
+                <div class="carousel-inner">
+                    {% set all_images = [] %}
+                    {% if p.image_url %}{% set _ = all_images.append(p.image_url) %}{% endif %}
+                    {% for img in p.images %}{% set _ = all_images.append(img.image_url) %}{% endfor %}
+                    {% if all_images %}
+                        {% for img_url in all_images[:4] %}
+                        <div class="carousel-item {% if loop.first %}active{% endif %}">
+                            <img src="{{ img_url }}" class="d-block w-100" alt="" style="height: 180px; object-fit: cover;">
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="carousel-item active">
+                            <div class="bg-light d-flex align-items-center justify-content-center" style="height: 180px;">
+                                <i class="bi bi-egg fs-1" style="color: var(--primary);"></i>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+                {% if all_images|length > 1 %}
+                <button class="carousel-control-prev" type="button" data-bs-target="#carousel{{ p.id }}" data-bs-slide="prev">
+                    <span class="carousel-control-prev-icon"></span>
+                </button>
+                <button class="carousel-control-next" type="button" data-bs-target="#carousel{{ p.id }}" data-bs-slide="next">
+                    <span class="carousel-control-next-icon"></span>
+                </button>
+                {% endif %}
             </div>
-            {% endif %}
             <div class="card-body">
                 <h5 class="card-title fw-bold">{{ p.name }}</h5>
                 <p class="card-text small mb-2">
@@ -85,6 +106,9 @@
                     <div class="btn-group">
                         <a href="/wishlist/tambah/{{ p.id }}" class="btn btn-outline-secondary btn-sm" title="Wishlist">
                             <i class="bi bi-heart"></i>
+                        </a>
+                        <a href="/produk/compare/{{ p.id }}" class="btn btn-outline-info btn-sm" title="Bandingkan">
+                            <i class="bi bi-arrow-left-right"></i>
                         </a>
                         <a href="/produk/{{ p.id }}/review" class="btn btn-outline-warning btn-sm" title="Review">
                             <i class="bi bi-star"></i>

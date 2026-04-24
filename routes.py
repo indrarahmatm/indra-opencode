@@ -5,7 +5,7 @@ from flask import render_template, redirect, url_for, request, flash, send_from_
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.utils import secure_filename
 from app import app, mail, db
-from models import User, Product, Order, OrderItem, Review, Wishlist, Category
+from models import User, Product, Order, OrderItem, Review, Wishlist, Category, ProductImage, Chat
 
 def sanitize_input(text):
     if text:
@@ -205,6 +205,22 @@ def produk_baru():
                            image_url=image_url, stok=stok)
             db.session.add(product)
             db.session.commit()
+            
+            files = request.files.getlist('images')
+            for i, file in enumerate(files):
+                if file and file.filename and allowed_file(file.filename):
+                    ext = file.filename.rsplit('.', 1)[1].lower()
+                    filename = f'produk_{product.id}_{i}_{int(datetime.utcnow().timestamp())}.{ext}'
+                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    file.save(filepath)
+                    img = ProductImage(
+                        product_id=product.id,
+                        image_url=f'/static/uploads/{filename}',
+                        is_primary=(i == 0 and not image_url)
+                    )
+                    db.session.add(img)
+            
+            db.session.commit()
             flash('Produk berhasil ditambahkan', 'success')
             return redirect(url_for('dashboard_peternak'))
         except (ValueError, TypeError):
@@ -240,6 +256,20 @@ def produk_edit(id):
                 product.image_url = f'/static/uploads/{filename}'
             else:
                 product.image_url = request.form.get('image_url', '').strip()
+
+            files = request.files.getlist('images')
+            for i, file in enumerate(files):
+                if file and file.filename and allowed_file(file.filename):
+                    ext = file.filename.rsplit('.', 1)[1].lower()
+                    filename = f'produk_{product.id}_{len(product.images)}_{int(datetime.utcnow().timestamp())}.{ext}'
+                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    file.save(filepath)
+                    img = ProductImage(
+                        product_id=product.id,
+                        image_url=f'/static/uploads/{filename}',
+                        is_primary=(len(product.images) == 0)
+                    )
+                    db.session.add(img)
 
             if product.berat_kg <= 0 or product.berat_kg > 50 or product.harga <= 0 or product.stok < 0:
                 flash('Input tidak valid', 'danger')
@@ -443,6 +473,19 @@ def pesanan_batal(order_id):
     db.session.commit()
     flash('Pesanan berhasil dibatalkan', 'success')
     return redirect(url_for('pesanan_saya'))
+
+@app.route('/pesanan-saya/detail/<int:order_id>')
+@login_required
+def pesanan_detail(order_id):
+    if current_user.role != 'buyer':
+        return redirect(url_for('index'))
+    
+    order = Order.query.get_or_404(order_id)
+    if order.buyer_id != current_user.id:
+        flash('Akses ditolak', 'danger')
+        return redirect(url_for('pesanan_saya'))
+    
+    return render_template('pesanan_detail.html', order=order)
 
 @app.route('/bukti-transfer/<int:order_id>', methods=['GET', 'POST'])
 @login_required
@@ -711,6 +754,97 @@ def wishlist_hapus(product_id):
         db.session.commit()
         flash('Dihapus dari wishlist', 'success')
     return redirect(url_for('wishlist'))
+
+@app.route('/bandingkan')
+def bandingkan():
+    ids = request.args.getlist('ids', type=int)
+    if len(ids) < 2:
+        flash('Pilih minimal 2 produk untuk dibandingkan', 'warning')
+        return redirect(url_for('index'))
+    
+    products = Product.query.filter(Product.id.in_(ids[:4])).all()
+    if len(products) < 2:
+        flash('Minimal 2 produk diperlukan', 'warning')
+        return redirect(url_for('index'))
+    
+    return render_template('bandingkan.html', products=products)
+
+@app.route('/produk/compare/<int:product_id>')
+def bandingkan_tambah(product_id):
+    product = Product.query.get_or_404(product_id)
+    compare_list = session.get('compare', [])
+    if product_id not in compare_list:
+        if len(compare_list) >= 4:
+            flash('Maksimal 4 produk untuk dibandingkan', 'warning')
+        else:
+            compare_list.append(product_id)
+    session['compare'] = compare_list
+    flash(f'Produk "{product.name}" ditambahkan ke comparison', 'success')
+    
+    if len(compare_list) >= 2:
+        return redirect(url_for('bandingkan', ids=compare_list))
+    return redirect(url_for('index'))
+
+@app.route('/produk/compare/clear')
+def bandingkan_clear():
+    session.pop('compare', None)
+    flash('Comparison cleared', 'info')
+    return redirect(url_for('index'))
+
+@app.route('/chat')
+@login_required
+def chat():
+    selected_user_id = request.args.get('user_id', type=int)
+    selected_user = None
+    
+    if current_user.role == 'admin':
+        chats = Chat.query.order_by(Chat.created_at.desc()).all()
+        users_with_chats = User.query.join(Chat).distinct().all()
+        if selected_user_id:
+            selected_user = User.query.get(selected_user_id)
+        return render_template('chat_admin.html', chats=chats, users=users_with_chats, selected_user=selected_user)
+    else:
+        chats = Chat.query.filter_by(user_id=current_user.id).order_by(Chat.created_at.asc()).all()
+        return render_template('chat.html', chats=chats)
+
+@app.route('/chat/kirim', methods=['POST'])
+@login_required
+def chat_kirim():
+    pesan = request.form.get('pesan', '').strip()
+    if not pesan:
+        flash('Pesan tidak boleh kosong', 'warning')
+        return redirect(url_for('chat'))
+    
+    chat = Chat(user_id=current_user.id, pesan=pesan, is_from_admin=False)
+    db.session.add(chat)
+    db.session.commit()
+    flash('Pesan terkirim', 'success')
+    return redirect(url_for('chat'))
+
+@app.route('/chat/admin/kirim/<int:user_id>', methods=['POST'])
+@login_required
+def chat_admin_kirim(user_id):
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    
+    pesan = request.form.get('pesan', '').strip()
+    if not pesan:
+        return redirect(url_for('chat'))
+    
+    chat = Chat(user_id=user_id, pesan=pesan, is_from_admin=True)
+    db.session.add(chat)
+    db.session.commit()
+    return redirect(url_for('chat'))
+
+@app.route('/chat/read/<int:user_id>')
+@login_required
+def chat_read(user_id):
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    
+    Chat.query.filter_by(user_id=user_id, is_from_admin=False, is_read=False).update({'is_read': True})
+    db.session.commit()
+    return redirect(url_for('chat'))
 
 @app.route('/produk/<int:product_id>/review', methods=['GET', 'POST'])
 @login_required

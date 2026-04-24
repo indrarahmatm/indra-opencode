@@ -33,6 +33,14 @@ class Product(db.Model):
 
     seller = db.relationship('User', backref='products')
     reviews = db.relationship('Review', backref='product', cascade='all, delete-orphan')
+    images = db.relationship('ProductImage', backref='product', cascade='all, delete-orphan')
+
+class ProductImage(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
+    image_url = db.Column(db.String(300), nullable=False)
+    is_primary = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Review(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -74,6 +82,16 @@ class Category(db.Model):
                 cat = Category(**d)
                 db.session.add(cat)
         db.session.commit()
+
+class Chat(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    pesan = db.Column(db.Text, nullable=False)
+    is_from_admin = db.Column(db.Boolean, default=False)
+    is_read = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    user = db.relationship('User', backref='chats')
 
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
