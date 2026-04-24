@@ -5,7 +5,7 @@ from flask import render_template, redirect, url_for, request, flash, send_from_
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.utils import secure_filename
 from app import app, mail, db
-from models import User, Product, Order, OrderItem, Review, Wishlist
+from models import User, Product, Order, OrderItem, Review, Wishlist, Category
 
 def sanitize_input(text):
     if text:
@@ -69,7 +69,8 @@ def allowed_file(filename):
 @app.route('/')
 def index():
     products = Product.query.all()
-    return render_template('index.html', products=products)
+    categories = Category.query.all()
+    return render_template('index.html', products=products, categories=categories)
 
 @app.route('/produk/search')
 def search_produk():
@@ -90,7 +91,8 @@ def search_produk():
         query = query.filter(Product.harga <= max_harga)
     
     products = query.order_by(Product.created_at.desc()).all()
-    return render_template('index.html', products=products, search_query=q, jenis_filter=jenis_filter)
+    categories = Category.query.all()
+    return render_template('index.html', products=products, search_query=q, jenis_filter=jenis_filter, categories=categories)
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -208,7 +210,8 @@ def produk_baru():
         except (ValueError, TypeError):
             flash('Input tidak valid', 'danger')
             return redirect(url_for('produk_baru'))
-    return render_template('produk_baru.html')
+    categories = Category.query.all()
+    return render_template('produk_baru.html', categories=categories)
 
 @app.route('/produk/edit/<int:id>', methods=['GET', 'POST'])
 @login_required
@@ -248,7 +251,8 @@ def produk_edit(id):
         except (ValueError, TypeError):
             flash('Input tidak valid', 'danger')
             return redirect(url_for('produk_edit', id=id))
-    return render_template('produk_edit.html', product=product)
+    categories = Category.query.all()
+    return render_template('produk_edit.html', product=product, categories=categories)
 
 @app.route('/produk/hapus/<int:id>')
 @login_required
@@ -414,6 +418,31 @@ def pesanan_saya():
         return redirect(url_for('index'))
     orders = Order.query.filter_by(buyer_id=current_user.id).order_by(Order.created_at.desc()).all()
     return render_template('pesanan_saya.html', orders=orders)
+
+@app.route('/pesanan-saya/batal/<int:order_id>')
+@login_required
+def pesanan_batal(order_id):
+    if current_user.role != 'buyer':
+        return redirect(url_for('index'))
+    
+    order = Order.query.get_or_404(order_id)
+    if order.buyer_id != current_user.id:
+        flash('Akses ditolak', 'danger')
+        return redirect(url_for('pesanan_saya'))
+    
+    if order.status not in ['pending', 'diproses']:
+        flash('Pesanan tidak bisa dibatalkan', 'warning')
+        return redirect(url_for('pesanan_saya'))
+    
+    for item in order.items:
+        product = Product.query.get(item.product_id)
+        if product:
+            product.stok += item.jumlah
+    
+    order.status = 'dibatalkan'
+    db.session.commit()
+    flash('Pesanan berhasil dibatalkan', 'success')
+    return redirect(url_for('pesanan_saya'))
 
 @app.route('/bukti-transfer/<int:order_id>', methods=['GET', 'POST'])
 @login_required
@@ -612,6 +641,42 @@ def dashboard_admin():
     users = User.query.all()
     orders = Order.query.order_by(Order.created_at.desc()).all()
     return render_template('dashboard_admin.html', users=users, orders=orders)
+
+@app.route('/admin/user/edit/<int:id>', methods=['GET', 'POST'])
+@login_required
+def admin_user_edit(id):
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    
+    user = User.query.get_or_404(id)
+    
+    if request.method == 'POST':
+        user.username = request.form.get('username', '').strip()
+        user.email = request.form.get('email', '').strip().lower()
+        new_role = request.form.get('role', '')
+        if new_role in ['peternak', 'buyer', 'admin']:
+            user.role = new_role
+        db.session.commit()
+        flash('User berhasil diupdate', 'success')
+        return redirect(url_for('dashboard_admin'))
+    
+    return render_template('admin_user_edit.html', user=user)
+
+@app.route('/admin/user/delete/<int:id>')
+@login_required
+def admin_user_delete(id):
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    
+    if id == current_user.id:
+        flash('Tidak bisa hapus diri sendiri', 'danger')
+        return redirect(url_for('dashboard_admin'))
+    
+    user = User.query.get_or_404(id)
+    db.session.delete(user)
+    db.session.commit()
+    flash(f'User {user.username} dihapus', 'success')
+    return redirect(url_for('dashboard_admin'))
 
 @app.route('/wishlist')
 @login_required

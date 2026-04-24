@@ -15,6 +15,7 @@
                             <th>Username</th>
                             <th>Email</th>
                             <th>Role</th>
+                            <th>Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -23,6 +24,11 @@
                             <td>{{ u.username }}</td>
                             <td>{{ u.email }}</td>
                             <td><span class="badge bg-{% if u.role == 'admin' %}danger{% elif u.role == 'peternak' %}success{% else %}secondary{% endif %}">{{ u.role }}</span></td>
+                            <td>
+                                <a href="{{ url_for('admin_user_edit', id=u.id) }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>

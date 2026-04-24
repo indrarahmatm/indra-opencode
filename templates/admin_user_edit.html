@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Edit User - EntokMart Admin{% endblock %}
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-person-gear"></i> Edit User</h2>
+
+<div class="card" style="max-width: 500px;">
+    <div class="card-body">
+        <form method="POST">
+            <div class="mb-3">
+                <label class="form-label">Username</label>
+                <input type="text" name="username" class="form-control" value="{{ user.username }}" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Email</label>
+                <input type="email" name="email" class="form-control" value="{{ user.email }}" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Role</label>
+                <select name="role" class="form-select">
+                    <option value="buyer" {% if user.role == 'buyer' %}selected{% endif %}>Buyer</option>
+                    <option value="peternak" {% if user.role == 'peternak' %}selected{% endif %}>Peternak</option>
+                    <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <small class="text-muted">Bergabung: {{ user.created_at.strftime('%d-%m-%Y') }}</small>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-entok">Simpan</button>
+                <a href="{{ url_for('dashboard_admin') }}" class="btn btn-outline-secondary">Batal</a>
+                <a href="{{ url_for('admin_user_delete', id=user.id) }}" class="btn btn-outline-danger ms-auto" onclick="return confirm('Hapus user ini?')">
+                    <i class="bi bi-trash"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

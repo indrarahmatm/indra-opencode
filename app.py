@@ -26,7 +26,7 @@ app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', 'norep
 mail = Mail(app)
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-from models import db, User
+from models import db, User, Category
 db.init_app(app)
 
 login_manager = LoginManager()
@@ -45,4 +45,5 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5003))
     with app.app_context():
         db.create_all()
+        Category.get_default_categories()
     app.run(debug=debug, port=port, use_reloader=False)

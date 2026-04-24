@@ -10,11 +10,11 @@
                 <input type="text" name="name" class="form-control" placeholder="Contoh: Entok Manila" required>
             </div>
             <div class="mb-3">
-                <label class="form-label">Jenis</label>
+                <label class="form-label">Kategori</label>
                 <select name="jenis" class="form-select" required>
-                    <option value="entok muda">Entok Muda (Bibit)</option>
-                    <option value="entok afkir">Entok Afkir (Dewasa)</option>
-                    <option value="entok培">Entok培 (Pandet)</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.slug }}">{{ cat.name }}</option>
+                    {% endfor %}
                 </select>
             </div>
             <div class="row">

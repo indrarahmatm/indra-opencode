@@ -10,11 +10,11 @@
                 <input type="text" name="name" class="form-control" value="{{ product.name }}" required>
             </div>
             <div class="mb-3">
-                <label class="form-label">Jenis</label>
+                <label class="form-label">Kategori</label>
                 <select name="jenis" class="form-select" required>
-                    <option value="entok muda" {% if product.jenis == 'entok muda' %}selected{% endif %}>Entok Muda (Bibit)</option>
-                    <option value="entok afkir" {% if product.jenis == 'entok afkir' %}selected{% endif %}>Entok Afkir (Dewasa)</option>
-                    <option value="entok培" {% if product.jenis == 'entok培' %}selected{% endif %}>Entok培 (Pandet)</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.slug }}" {% if product.jenis == cat.slug %}selected{% endif %}>{{ cat.name }}</option>
+                    {% endfor %}
                 </select>
             </div>
             <div class="row">

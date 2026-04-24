@@ -53,6 +53,28 @@ class Wishlist(db.Model):
     user = db.relationship('User', backref='wishlists')
     product = db.relationship('Product')
 
+class Category(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+    slug = db.Column(db.String(100), unique=True)
+    description = db.Column(db.Text)
+    
+    @staticmethod
+    def get_default_categories():
+        defaults = [
+            {'name': 'Entok Muda (Bibit)', 'slug': 'entok-muda', 'description': 'Entok usia muda untuk bibit'},
+            {'name': 'Entok Afkir (Dewasa)', 'slug': 'entok-afkir', 'description': 'Entok dewasa afkir produktif'},
+            {'name': 'Entok Pandet', 'slug': 'entok-pandet', 'description': 'Entok pandet berkualitas'},
+            {'name': 'Telur Entok', 'slug': 'telur-entok', 'description': 'Telur entok segar'},
+            {'name': 'Daging Entok', 'slug': 'daging-entok', 'description': 'Daging entok segar'},
+            {'name': 'Pakan & Obat', 'slug': 'pakan-obat', 'description': 'Pakan dan obat-obatan ternak'},
+        ]
+        for d in defaults:
+            if not Category.query.filter_by(slug=d['slug']).first():
+                cat = Category(**d)
+                db.session.add(cat)
+        db.session.commit()
+
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     buyer_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
