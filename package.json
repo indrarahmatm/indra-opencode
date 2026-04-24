@@ -1,0 +1,42 @@
+{
+  "name": "sunny-star",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "remotion studio src/index.tsx --port 3000",
+    "build": "remotion render src/index.tsx Video out/video.mp4",
+    "preview": "remotion preview src/index.tsx"
+  },
+  "dependencies": {
+    "@remotion/animated-emoji": "4.0.451",
+    "@remotion/animation-utils": "4.0.451",
+    "@remotion/cli": "^4.0.0",
+    "@remotion/cloudrun": "4.0.451",
+    "@remotion/enable-scss": "4.0.451",
+    "@remotion/fonts": "4.0.451",
+    "@remotion/gif": "4.0.451",
+    "@remotion/google-fonts": "4.0.451",
+    "@remotion/install-whisper-cpp": "4.0.451",
+    "@remotion/lambda": "4.0.451",
+    "@remotion/layout-utils": "4.0.451",
+    "@remotion/licensing": "4.0.451",
+    "@remotion/lottie": "4.0.451",
+    "@remotion/mcp": "4.0.451",
+    "@remotion/media-utils": "4.0.451",
+    "@remotion/motion-blur": "4.0.451",
+    "@remotion/noise": "4.0.451",
+    "@remotion/paths": "4.0.451",
+    "@remotion/player": "4.0.451",
+    "@remotion/preload": "4.0.451",
+    "@remotion/renderer": "4.0.451",
+    "@remotion/rive": "4.0.451",
+    "@remotion/rounded-text-box": "4.0.451",
+    "@remotion/studio": "4.0.451",
+    "@remotion/tailwind": "4.0.451",
+    "@remotion/tailwind-v4": "4.0.451",
+    "@remotion/transitions": "4.0.451",
+    "@remotion/whisper-web": "4.0.451",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "remotion": "^4.0.0"
+  }
+}

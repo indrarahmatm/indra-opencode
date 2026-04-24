@@ -40,7 +40,17 @@ class Order(db.Model):
     nama_penerima = db.Column(db.String(150))
     alamat = db.Column(db.Text)
     telp = db.Column(db.String(20))
+    # Payment fields
+    payment_method = db.Column(db.String(20), default='cod')  # 'cod', 'manual'
+    payment_status = db.Column(db.String(20), default='pending')  # 'pending', 'confirmed', 'failed'
+    bank_name = db.Column(db.String(50))
+    bank_account = db.Column(db.String(50))
+    transfer_proof_url = db.Column(db.String(300))
+    # Shipping
+    resi = db.Column(db.String(50))
+    # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     buyer = db.relationship('User', backref='orders')
     items = db.relationship('OrderItem', backref='order', cascade='all, delete-orphan')

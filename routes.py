@@ -26,6 +26,27 @@ def index():
     products = Product.query.all()
     return render_template('index.html', products=products)
 
+@app.route('/produk/search')
+def search_produk():
+    q = request.args.get('q', '').strip()
+    jenis_filter = request.args.get('jenis', '')
+    min_harga = request.args.get('min_harga', type=int)
+    max_harga = request.args.get('max_harga', type=int)
+    
+    query = Product.query
+    
+    if q:
+        query = query.filter(Product.name.ilike(f'%{q}%'))
+    if jenis_filter:
+        query = query.filter(Product.jenis == jenis_filter)
+    if min_harga and min_harga > 0:
+        query = query.filter(Product.harga >= min_harga)
+    if max_harga and max_harga > 0:
+        query = query.filter(Product.harga <= max_harga)
+    
+    products = query.order_by(Product.created_at.desc()).all()
+    return render_template('index.html', products=products, search_query=q, jenis_filter=jenis_filter)
+
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -237,9 +258,14 @@ def checkout():
         return redirect(url_for('keranjang'))
 
     if request.method == 'POST':
-        nama_penerima = request.form['nama_penerima']
-        alamat = request.form['alamat']
-        telp = request.form['telp']
+        nama_penerima = request.form.get('nama_penerima', '').strip()
+        alamat = request.form.get('alamat', '').strip()
+        telp = request.form.get('telp', '').strip()
+        payment_method = request.form.get('payment_method', 'cod')
+        
+        if not nama_penerima or not alamat or not telp:
+            flash('Semua field wajib diisi', 'danger')
+            return redirect(url_for('checkout'))
 
         total_harga = 0
         for item in cart:
@@ -248,7 +274,8 @@ def checkout():
                 total_harga += product.harga * item['jumlah']
 
         order = Order(buyer_id=current_user.id, total_harga=total_harga,
-                     nama_penerima=nama_penerima, alamat=alamat, telp=telp)
+                     nama_penerima=nama_penerima, alamat=alamat, telp=telp,
+                     payment_method=payment_method, payment_status='pending')
         db.session.add(order)
         db.session.commit()
 
@@ -262,7 +289,7 @@ def checkout():
 
         db.session.commit()
         session['cart'] = []
-        flash('Pesanan berhasil dibuat!', 'success')
+        flash(f'Pesanan berhasil dibuat! ({payment_method.upper()})', 'success')
         return redirect(url_for('pesanan_saya'))
 
     total = 0
@@ -293,10 +320,25 @@ def pesanan():
 def pesanan_update(id):
     if current_user.role != 'peternak':
         return redirect(url_for('index'))
-    order = Order.query.get_or_404(id)
-    order.status = request.form['status']
+    
+    order = Order.query.get(id)
+    if not order:
+        flash('Pesanan tidak ditemukan', 'danger')
+        return redirect(url_for('pesanan'))
+    
+    status = request.form.get('status', '')
+    resi = request.form.get('resi', '').strip()
+    payment_status = request.form.get('payment_status', '')
+    
+    if status and status in ['pending', 'diproses', 'dikirim', 'selesai']:
+        order.status = status
+    if resi:
+        order.resi = resi
+    if payment_status and payment_status in ['pending', 'confirmed', 'failed']:
+        order.payment_status = payment_status
+    
     db.session.commit()
-    flash('Status pesanan diupdate', 'success')
+    flash('Pesanan diupdate', 'success')
     return redirect(url_for('pesanan'))
 
 @app.route('/admin')

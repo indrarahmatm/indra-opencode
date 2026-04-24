@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Pesanan Saya - EntokMart{% endblock %}
 {% block content %}
-<h2 class="mb-4">Pesanan Saya</h2>
+<h2 class="mb-4"><i class="bi bi-bag-check"></i> Pesanan Saya</h2>
 {% for order in orders %}
 <div class="card mb-3">
-    <div class="card-header bg-white d-flex justify-content-between">
-        <span>Order #{{ order.id }}</span>
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <span><strong>Order #{{ order.id }}</strong></span>
         <span class="badge bg-{% if order.status == 'selesai' %}success{% elif order.status == 'dikirim' %}info{% elif order.status == 'diproses' %}warning{% else %}secondary{% endif %}">{{ order.status }}</span>
     </div>
     <div class="card-body">
@@ -29,11 +29,37 @@
                 {% endfor %}
             </tbody>
         </table>
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <strong>Total: Rp {{ "{:,}".format(order.total_harga) }}</strong>
+        
+        <div class="row mt-3">
+            <div class="col-md-6">
+                <p class="mb-1"><strong>Total: Rp {{ "{:,}".format(order.total_harga) }}</strong></p>
                 <p class="text-muted small mb-0">Alamat: {{ order.alamat }}</p>
             </div>
+            <div class="col-md-6">
+                <div class="p-3 bg-light rounded">
+                    <p class="mb-1"><strong>Pengiriman:</strong></p>
+                    <p class="mb-1 small">Status: <span class="badge bg-{% if order.status == 'selesai' %}success{% elif order.status == 'dikirim' %}info{% elif order.status == 'diproses' %}warning{% else %}secondary{% endif %}">{{ order.status }}</span></p>
+                    {% if order.resi %}
+                    <p class="mb-0 small">No. Resi: <strong>{{ order.resi }}</strong></p>
+                    {% else %}
+                    <p class="mb-0 small text-muted">Resi belum ada</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="card-footer bg-white">
+        <div class="row">
+            <div class="col-md-6">
+                <p class="mb-1"><strong>Pembayaran:</strong></p>
+                <p class="mb-1 small">Method: <span class="badge bg-primary">{{ order.payment_method|upper }}</span></p>
+                <p class="mb-0 small">Status: <span class="badge bg-{% if order.payment_status == 'confirmed' %}success{% elif order.payment_status == 'failed' %}danger{% else %}warning{% endif %}">{{ order.payment_status }}</span></p>
+            </div>
+            {% if order.payment_method == 'manual' and order.payment_status == 'pending' %}
+            <div class="col-md-6 text-end">
+                <button class="btn btn-entok btn-sm">Upload Bukti Transfer</button>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>

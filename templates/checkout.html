@@ -4,12 +4,12 @@
 <h2 class="mb-4">Checkout</h2>
 <div class="row">
     <div class="col-md-7">
-        <div class="card">
+        <div class="card mb-4">
             <div class="card-header bg-white">
-                <h5 class="mb-0">Alamat Pengiriman</h5>
+                <h5 class="mb-0"><i class="bi bi-truck"></i> Alamat Pengiriman</h5>
             </div>
             <div class="card-body">
-                <form method="POST">
+                <form method="POST" id="checkoutForm">
                     <div class="mb-3">
                         <label class="form-label">Nama Penerima</label>
                         <input type="text" name="nama_penerima" class="form-control" required>
@@ -22,21 +22,72 @@
                         <label class="form-label">No. Telepon</label>
                         <input type="text" name="telp" class="form-control" required>
                     </div>
-                    <button type="submit" class="btn btn-entok w-100">Pesan Sekarang</button>
                 </form>
             </div>
         </div>
+        
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-credit-card"></i> Metode Pembayaran</h5>
+            </div>
+            <div class="card-body">
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="radio" name="payment_method" id="payment_cod" value="cod" checked>
+                    <label class="form-check-label" for="payment_cod">
+                        <strong>Cash on Delivery (COD)</strong>
+                        <p class="text-muted small mb-0">Bayar saat barang diterima</p>
+                    </label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="payment_method" id="payment_manual" value="manual">
+                    <label class="form-check-label" for="payment_manual">
+                        <strong>Transfer Bank Manual</strong>
+                        <p class="text-muted small mb-0">Transfer ke rekening kami, lalu upload bukti</p>
+                    </label>
+                </div>
+                
+                <div id="bankInfo" class="alert alert-info mt-3" style="display: none;">
+                    <h6 class="fw-bold">Bank Transfer</h6>
+                    <p class="mb-1"><strong>Bank BRI</strong></p>
+                    <p class="mb-1">No. Rek: <strong>1234-5678-9012</strong></p>
+                    <p class="mb-0">A/N: <strong>EntokMart</strong></p>
+                    <hr>
+                    <p class="small text-muted mb-0">Setelah transfer, upload bukti di halaman pesanan</p>
+                </div>
+            </div>
+        </div>
     </div>
+    
     <div class="col-md-5">
         <div class="card">
             <div class="card-header bg-white">
                 <h5 class="mb-0">Rincian Pesanan</h5>
             </div>
             <div class="card-body">
-                <h3 class="text-success">Total: Rp {{ "{:,}".format(total) }}</h3>
-                <p class="text-muted small">Silakan isi alamat untuk melanjutkan pesanan</p>
+                <h3 class="text-accent">Total: Rp {{ "{:,}".format(total) }}</h3>
+                <hr>
+                <p class="small text-muted">
+                    <i class="bi bi-info-circle"></i> 
+                    {% if total < 500000 %}Gratis ongkir{% else %}Gratis ongkir{% endif %}
+                </p>
+                <button type="submit" form="checkoutForm" class="btn btn-entok w-100 py-2">
+                    <i class="bi bi-cart-check"></i> Pesan Sekarang
+                </button>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+document.querySelectorAll('input[name="payment_method"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+        const bankInfo = document.getElementById('bankInfo');
+        if (this.value === 'manual') {
+            bankInfo.style.display = 'block';
+        } else {
+            bankInfo.style.display = 'none';
+        }
+    });
+});
+</script>
 {% endblock %}

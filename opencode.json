@@ -1,0 +1,16 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": [
+    ".opencode/plugins/graphify.js"
+  ],
+  "mcp": {
+    "github": {
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-github"],
+      "enabled": true,
+      "environment": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "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"
+      }
+    }
+  }
+}

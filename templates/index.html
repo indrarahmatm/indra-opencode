@@ -8,7 +8,37 @@
     </div>
 </div>
 
-<h3 class="mb-4"><i class="bi bi-archive"></i> Katalog Entok</h3>
+<form action="/produk/search" method="GET" class="mb-4 p-3 bg-white rounded shadow-sm">
+    <div class="row g-2">
+        <div class="col-md-4">
+            <input type="text" name="q" class="form-control" placeholder="Cari entok..." value="{{ search_query or '' }}">
+        </div>
+        <div class="col-md-3">
+            <select name="jenis" class="form-select">
+                <option value="">Semua Jenis</option>
+                <option value="entok muda" {% if jenis_filter == 'entok muda' %}selected{% endif %}>Entok Muda (Bibit)</option>
+                <option value="entok afkir" {% if jenis_filter == 'entok afkir' %}selected{% endif %}>Entok AFKIR</option>
+                <option value="entok培" {% if jenis_filter == 'entok培' %}selected{% endif %}>Entok Pandet</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <input type="number" name="min_harga" class="form-control" placeholder="Min Harga">
+        </div>
+        <div class="col-md-2">
+            <input type="number" name="max_harga" class="form-control" placeholder="Max Harga">
+        </div>
+        <div class="col-md-1">
+            <button type="submit" class="btn btn-entok w-100"><i class="bi bi-search"></i></button>
+        </div>
+    </div>
+    {% if search_query or jenis_filter %}
+    <div class="mt-2">
+        <a href="/" class="btn btn-sm btn-outline-secondary">Clear Filter</a>
+    </div>
+    {% endif %}
+</form>
+
+<h3 class="mb-4"><i class="bi bi-archive"></i> Katalog Entok {% if search_query or jenis_filter %}(Filtered){% endif %}</h3>
 <div class="row">
     {% for p in products %}
     <div class="col-md-3 mb-4">

@@ -1,32 +1,56 @@
 {% extends "base.html" %}
 {% block title %}Pesanan Masuk - EntokMart{% endblock %}
 {% block content %}
-<h2 class="mb-4">Pesanan Masuk</h2>
+<h2 class="mb-4"><i class="bi bi-inbox"></i> Pesanan Masuk</h2>
 {% for item in items %}
 <div class="card mb-3">
     <div class="card-body">
         <div class="d-flex justify-content-between">
             <div>
                 <h5>{{ item.nama_product }}</h5>
-                <p class="text-muted mb-1">Pembeli: {{ item.order.buyer.username }}</p>
+                <p class="mb-1">Pembeli: <strong>{{ item.order.buyer.username }}</strong></p>
+                <p class="mb-1 text-muted">Telepon: {{ item.order.telp }}</p>
                 <p class="text-muted small mb-0">Alamat: {{ item.order.alamat }}</p>
             </div>
             <div class="text-end">
                 <p>{{ item.jumlah }} x Rp {{ "{:,}".format(item.harga_saat_beli) }}</p>
-                <p class="text-muted">Total: Rp {{ "{:,}".format(item.harga_saat_beli * item.jumlah) }}</p>
+                <p class="text-accent fw-bold">Total: Rp {{ "{:,}".format(item.harga_saat_beli * item.jumlah) }}</p>
             </div>
         </div>
     </div>
     <div class="card-footer bg-white">
-        <form action="/pesanan/update/{{ item.order.id }}" method="POST" class="d-flex align-items-center">
-            <label class="me-2">Status:</label>
-            <select name="status" class="form-select form-select-sm" style="width: auto;">
-                <option value="pending" {% if item.order.status == 'pending' %}selected{% endif %}>Pending</option>
-                <option value="diproses" {% if item.order.status == 'diproses' %}selected{% endif %}>Diproses</option>
-                <option value="dikirim" {% if item.order.status == 'dikirim' %}selected{% endif %}>Dikirim</option>
-                <option value="selesai" {% if item.order.status == 'selesai' %}selected{% endif %}>Selesai</option>
-            </select>
-            <button type="submit" class="btn btn-sm btn-entok ms-2">Update</button>
+        <form action="/pesanan/update/{{ item.order.id }}" method="POST">
+            <div class="row g-3">
+                <div class="col-md-2">
+                    <label class="form-label small">Status</label>
+                    <select name="status" class="form-select form-select-sm">
+                        <option value="pending" {% if item.order.status == 'pending' %}selected{% endif %}>Pending</option>
+                        <option value="diproses" {% if item.order.status == 'diproses' %}selected{% endif %}>Diproses</option>
+                        <option value="dikirim" {% if item.order.status == 'dikirim' %}selected{% endif %}>Dikirim</option>
+                        <option value="selesai" {% if item.order.status == 'selesai' %}selected{% endif %}>Selesai</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small">No. Resi</label>
+                    <input type="text" name="resi" class="form-control form-control-sm" value="{{ item.order.resi or '' }}" placeholder="Masukkan no. resi">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Pembayaran</label>
+                    <select name="payment_status" class="form-select form-select-sm">
+                        <option value="pending" {% if item.order.payment_status == 'pending' %}selected{% endif %}>Pending</option>
+                        <option value="confirmed" {% if item.order.payment_status == 'confirmed' %}selected{% endif %}>Confirmed</option>
+                        <option value="failed" {% if item.order.payment_status == 'failed' %}selected{% endif %}>Failed</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small">Metode</label>
+                    <input type="text" class="form-control form-control-sm" value="{{ item.order.payment_method|upper }}" readonly>
+                </div>
+                <div class="col-md-2">
+                    <label class="d-block">&nbsp;</label>
+                    <button type="submit" class="btn btn-entok btn-sm">Update</button>
+                </div>
+            </div>
         </form>
     </div>
 </div>
