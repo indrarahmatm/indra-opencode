@@ -125,11 +125,10 @@
                 </ul>
                 <ul class="navbar-nav">
                     {% if current_user.is_authenticated %}
-                        <li class="nav-item"><span class="nav-link">{{ current_user.username }}</span></li>
-                        <li class="nav-item"><a class="nav-link" href="/logout">Logout</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/profil">Profil</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/logout">Logout ({{ current_user.username }})</a></li>
                     {% else %}
-                        <li class="nav-item"><a class="nav-link" href="/login">Login</a></li>
-                        <li class="nav-item"><a class="btn btn-entok ms-2" href="/register">Daftar</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/login">Login</a></li>
                     {% endif %}
                 </ul>
             </div>

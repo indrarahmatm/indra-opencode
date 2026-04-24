@@ -4,8 +4,8 @@ from datetime import datetime
 from flask import render_template, redirect, url_for, request, flash, send_from_directory
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.utils import secure_filename
-from app import app
-from models import db, User, Product, Order, OrderItem
+from app import app, mail, db
+from models import User, Product, Order, OrderItem
 
 def sanitize_input(text):
     if text:
@@ -21,6 +21,45 @@ def validate_password(password):
     if not password or len(password) < 6:
         return False
     return True
+
+def send_order_notification(order, status_text, recipient_email=None):
+    try:
+        from flask_mail import Message
+        if not app.config.get('MAIL_USERNAME'):
+            return False
+        
+        if recipient_email is None:
+            recipient_email = order.buyer.email
+        
+        msg = Message(
+            subject=f"EntokMart - Status Pesanan #{order.id} Updated",
+            recipients=[recipient_email],
+            body=f"Halo {order.buyer.username},\n\nPesanan #{order.id} Anda telah diupdate:\nStatus: {status_text}\nTotal: Rp {order.total_harga:,}\n\nTerima kasih telah berbelanja di EntokMart!"
+        )
+        mail.send(msg)
+        return True
+    except Exception:
+        return False
+
+def send_seller_notification(order, item, status_text):
+    try:
+        from flask_mail import Message
+        if not app.config.get('MAIL_USERNAME'):
+            return False
+        
+        seller = User.query.get(item.product.seller_id)
+        if not seller or not seller.email:
+            return False
+        
+        msg = Message(
+            subject=f"EntokMart - Pesanan Baru #{order.id}",
+            recipients=[seller.email],
+            body=f"Halo {seller.username},\n\nAnda menerima pesanan baru:\nProduk: {item.nama_product}\nJumlah: {item.jumlah}\nTotal: Rp {item.harga_saat_buyer * item.jumlah:,}\n\nSegera proses pesanan ini!"
+        )
+        mail.send(msg)
+        return True
+    except Exception:
+        return False
 
 VALID_STATUSES = ['pending', 'diproses', 'dikirim', 'selesai']
 
@@ -301,7 +340,8 @@ def checkout():
                      payment_method=payment_method, payment_status='pending')
         db.session.add(order)
         db.session.commit()
-
+        session['cart'] = []
+        
         for item in cart:
             product = Product.query.get(item['product_id'])
             if product:
@@ -309,9 +349,21 @@ def checkout():
                                    jumlah=item['jumlah'], harga_saat_beli=product.harga,
                                    nama_product=product.name, nama_peternak=product.seller.username)
                 db.session.add(order_item)
-
+        
         db.session.commit()
-        session['cart'] = []
+        
+        try:
+            from flask_mail import Message
+            if app.config.get('MAIL_USERNAME'):
+                msg = Message(
+                    subject=f"EntokMart - Pesanan #{order.id} Diterima",
+                    recipients=[current_user.email],
+                    body=f"Halo {current_user.username},\n\nTerima kasih! Pesanan #{order.id} Anda telah diterima.\n\nTotal: Rp {total_harga:,}\nMetode: {payment_method.upper()}\n\nKami akan segera memproses pesanan Anda."
+                )
+                mail.send(msg)
+        except Exception:
+            pass
+        
         flash(f'Pesanan berhasil dibuat! ({payment_method.upper()})', 'success')
         return redirect(url_for('pesanan_saya'))
 
@@ -392,6 +444,75 @@ def laporan():
                        pesanan_diproses=len(pesanan_diproses),
                        items=items)
 
+@app.route('/profil', methods=['GET', 'POST'])
+@login_required
+def profil():
+    if request.method == 'POST':
+        new_username = request.form.get('username', '').strip()
+        new_email = request.form.get('email', '').strip()
+        
+        if not new_username or not new_email:
+            flash('Username dan email wajib diisi', 'danger')
+            return redirect(url_for('profil'))
+        
+        existing = User.query.filter(
+            ((User.username == new_username) | (User.email == new_email)),
+            User.id != current_user.id
+        ).first()
+        
+        if existing:
+            flash('Username atau email sudah digunakan', 'danger')
+            return redirect(url_for('profil'))
+        
+        current_user.username = new_username
+        current_user.email = new_email
+        db.session.commit()
+        flash('Profil berhasil diupdate', 'success')
+        return redirect(url_for('profil'))
+    
+    return render_template('profil.html')
+
+@app.route('/profil/password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    if request.method == 'POST':
+        current_password = request.form.get('current_password', '')
+        new_password = request.form.get('new_password', '')
+        confirm_password = request.form.get('confirm_password', '')
+        
+        if not current_user.check_password(current_password):
+            flash('Password saat ini salah', 'danger')
+            return redirect(url_for('change_password'))
+        
+        if len(new_password) < 6:
+            flash('Password baru minimal 6 karakter', 'danger')
+            return redirect(url_for('change_password'))
+        
+        if new_password != confirm_password:
+            flash('Password baru tidak cocok', 'danger')
+            return redirect(url_for('change_password'))
+        
+        current_user.set_password(new_password)
+        db.session.commit()
+        flash('Password berhasil diubah', 'success')
+        return redirect(url_for('profil'))
+    
+    return render_template('change_password.html')
+
+@app.route('/lupa-password', methods=['GET', 'POST'])
+def lupa_password():
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip()
+        user = User.query.filter_by(email=email).first()
+        
+        if user:
+            flash('Link reset password telah dikirim ke email Anda (fitur belum aktif)', 'info')
+        else:
+            flash('Email tidak ditemukan', 'danger')
+        return redirect(url_for('login'))
+    
+    return render_template('lupa_password.html')
+
 @app.route('/pesanan/update/<int:id>', methods=['POST'])
 @login_required
 def pesanan_update(id):
@@ -407,6 +528,7 @@ def pesanan_update(id):
     resi = request.form.get('resi', '').strip()
     payment_status = request.form.get('payment_status', '')
     
+    old_status = order.status
     if status and status in ['pending', 'diproses', 'dikirim', 'selesai']:
         order.status = status
     if resi:
@@ -415,6 +537,24 @@ def pesanan_update(id):
         order.payment_status = payment_status
     
     db.session.commit()
+    
+    if old_status != order.status or resi:
+        try:
+            from flask_mail import Message
+            if app.config.get('MAIL_USERNAME'):
+                status_text = order.status.capitalize()
+                if resi:
+                    status_text += f" - No. Resi: {resi}"
+                
+                msg = Message(
+                    subject=f"EntokMart - Pesanan #{order.id} Update",
+                    recipients=[order.buyer.email],
+                    body=f"Halo {order.buyer.username},\n\nPesanan #{order.id} Anda telah diupdate.\n\nStatus: {status_text}\nTotal: Rp {order.total_harga:,}\n\nTerima kasih!"
+                )
+                mail.send(msg)
+        except Exception:
+            pass
+    
     flash('Pesanan diupdate', 'success')
     return redirect(url_for('pesanan'))
 

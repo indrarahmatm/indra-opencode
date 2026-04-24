@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Edit Profil - EntokMart{% endblock %}
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-person"></i> Edit Profil</h2>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Informasi Profil</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Username</label>
+                        <input type="text" name="username" class="form-control" value="{{ current_user.username }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" name="email" class="form-control" value="{{ current_user.email }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Role</label>
+                        <input type="text" class="form-control" value="{{ current_user.role|capitalize }}" readonly>
+                    </div>
+                    <button type="submit" class="btn btn-entok">Simpan Perubahan</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Ubah Password</h5>
+            </div>
+            <div class="card-body">
+                <a href="{{ url_for('change_password') }}" class="btn btn-outline-secondary">Ganti Password</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
