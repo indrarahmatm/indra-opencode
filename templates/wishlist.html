@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Wishlist - EntokMart{% endblock %}
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-heart"></i> Wishlist Saya</h2>
+
+<div class="row">
+    {% for w in wishlist_items %}
+    <div class="col-md-3 mb-4">
+        <div class="card card-produk h-100">
+            {% if w.product.image_url %}
+            <img src="{{ w.product.image_url }}" class="card-img-top" alt="{{ w.product.name }}" style="height: 180px; object-fit: cover;">
+            {% else %}
+            <div class="bg-light d-flex align-items-center justify-content-center" style="height: 180px;">
+                <i class="bi bi-egg fs-1" style="color: var(--primary);"></i>
+            </div>
+            {% endif %}
+            <div class="card-body">
+                <h5 class="card-title fw-bold">{{ w.product.name }}</h5>
+                <p class="small text-muted">{{ w.product.jenis }} | {{ w.product.berat_kg }} kg</p>
+                <h4 class="text-entok fw-bold">Rp {{ "{:,}".format(w.product.harga) }}</h4>
+                {% if w.product.stok > 0 %}
+                <p class="small text-success"><i class="bi bi-check-circle"></i> Stok: {{ w.product.stok }}</p>
+                {% else %}
+                <p class="small text-danger"><i class="bi bi-x-circle"></i> Stok Habis</p>
+                {% endif %}
+            </div>
+            <div class="card-footer bg-white border-0">
+                <div class="d-flex justify-content-between">
+                    {% if w.product.stok > 0 %}
+                    <form action="/keranjang/tambah/{{ w.product.id }}" method="POST">
+                        <input type="number" name="jumlah" value="1" min="1" max="{{ w.product.stok }}" class="form-control form-control-sm d-inline" style="width: 60px;">
+                        <button type="submit" class="btn btn-entok btn-sm"><i class="bi bi-cart-plus"></i></button>
+                    </form>
+                    {% endif %}
+                    <a href="/wishlist/hapus/{{ w.product.id }}" class="btn btn-outline-danger btn-sm" onclick="return confirm('Hapus dari wishlist?')">
+                        <i class="bi bi-trash"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12 text-center py-5">
+        <i class="bi bi-heart fs-1 text-muted"></i>
+        <p class="text-muted mt-3">Wishlist kosong</p>
+        <a href="/" class="btn btn-entok">Lihat Produk</a>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

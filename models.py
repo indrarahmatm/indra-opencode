@@ -28,9 +28,30 @@ class Product(db.Model):
     harga = db.Column(db.Integer, nullable=False)
     deskripsi = db.Column(db.Text)
     image_url = db.Column(db.String(300))
+    stok = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     seller = db.relationship('User', backref='products')
+    reviews = db.relationship('Review', backref='product', cascade='all, delete-orphan')
+
+class Review(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
+    buyer_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    rating = db.Column(db.Integer, nullable=False)
+    komentar = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    buyer = db.relationship('User', backref='reviews')
+
+class Wishlist(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    user = db.relationship('User', backref='wishlists')
+    product = db.relationship('Product')
 
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)

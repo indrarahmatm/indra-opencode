@@ -5,7 +5,7 @@ from flask import render_template, redirect, url_for, request, flash, send_from_
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.utils import secure_filename
 from app import app, mail, db
-from models import User, Product, Order, OrderItem
+from models import User, Product, Order, OrderItem, Review, Wishlist
 
 def sanitize_input(text):
     if text:
@@ -174,6 +174,7 @@ def produk_baru():
             berat_kg = float(request.form['berat_kg'])
             harga = int(request.form['harga'])
             deskripsi = request.form['deskripsi'].strip()
+            stok = int(request.form.get('stok', 0))
             
             image_url = request.form.get('image_url', '').strip()
             file = request.files.get('image')
@@ -193,9 +194,13 @@ def produk_baru():
             if harga <= 0:
                 flash('Harga tidak valid', 'danger')
                 return redirect(url_for('produk_baru'))
+            if stok < 0:
+                flash('Stok tidak valid', 'danger')
+                return redirect(url_for('produk_baru'))
 
             product = Product(seller_id=current_user.id, name=name, jenis=jenis,
-                           berat_kg=berat_kg, harga=harga, deskripsi=deskripsi, image_url=image_url)
+                           berat_kg=berat_kg, harga=harga, deskripsi=deskripsi, 
+                           image_url=image_url, stok=stok)
             db.session.add(product)
             db.session.commit()
             flash('Produk berhasil ditambahkan', 'success')
@@ -221,6 +226,7 @@ def produk_edit(id):
             product.berat_kg = float(request.form['berat_kg'])
             product.harga = int(request.form['harga'])
             product.deskripsi = request.form['deskripsi'].strip()
+            product.stok = int(request.form.get('stok', 0))
             
             file = request.files.get('image')
             if file and file.filename and allowed_file(file.filename):
@@ -232,7 +238,7 @@ def produk_edit(id):
             else:
                 product.image_url = request.form.get('image_url', '').strip()
 
-            if product.berat_kg <= 0 or product.berat_kg > 50 or product.harga <= 0:
+            if product.berat_kg <= 0 or product.berat_kg > 50 or product.harga <= 0 or product.stok < 0:
                 flash('Input tidak valid', 'danger')
                 return redirect(url_for('produk_edit', id=id))
 
@@ -287,12 +293,31 @@ def keranjang():
 def keranjang_tambah(product_id):
     if current_user.role != 'buyer':
         return redirect(url_for('index'))
+    
+    product = Product.query.get(product_id)
+    if not product:
+        flash('Produk tidak ditemukan', 'danger')
+        return redirect(url_for('index'))
+    
+    if product.stok <= 0:
+        flash('Maaf, stok produk habis', 'warning')
+        return redirect(url_for('keranjang'))
+    
     jumlah = int(request.form.get('jumlah', 1))
+    
+    if jumlah > product.stok:
+        flash(f'Stok tidak mencukupi. Tersedia: {product.stok}', 'warning')
+        return redirect(url_for('keranjang'))
+    
     cart = session.get('cart', [])
 
     existing = next((item for item in cart if item['product_id'] == product_id), None)
     if existing:
-        existing['jumlah'] += jumlah
+        new_qty = existing['jumlah'] + jumlah
+        if new_qty > product.stok:
+            flash(f'Stok tidak mencukupi. Total di keranjang: {existing["jumlah"] + product.stok}', 'warning')
+            return redirect(url_for('keranjang'))
+        existing['jumlah'] = new_qty
     else:
         cart.append({'product_id': product_id, 'jumlah': jumlah})
 
@@ -330,17 +355,23 @@ def checkout():
             return redirect(url_for('checkout'))
 
         total_harga = 0
+        insufficient_stock = []
         for item in cart:
             product = Product.query.get(item['product_id'])
             if product:
+                if item['jumlah'] > product.stok:
+                    insufficient_stock.append(f"{product.name} (tersedia: {product.stok})")
                 total_harga += product.harga * item['jumlah']
+        
+        if insufficient_stock:
+            flash(f'Stok tidak mencukupi: {", ".join(insufficient_stock)}', 'danger')
+            return redirect(url_for('keranjang'))
 
         order = Order(buyer_id=current_user.id, total_harga=total_harga,
                      nama_penerima=nama_penerima, alamat=alamat, telp=telp,
                      payment_method=payment_method, payment_status='pending')
         db.session.add(order)
         db.session.commit()
-        session['cart'] = []
         
         for item in cart:
             product = Product.query.get(item['product_id'])
@@ -349,8 +380,10 @@ def checkout():
                                    jumlah=item['jumlah'], harga_saat_beli=product.harga,
                                    nama_product=product.name, nama_peternak=product.seller.username)
                 db.session.add(order_item)
+                product.stok -= item['jumlah']
         
         db.session.commit()
+        session['cart'] = []
         
         try:
             from flask_mail import Message
@@ -579,3 +612,71 @@ def dashboard_admin():
     users = User.query.all()
     orders = Order.query.order_by(Order.created_at.desc()).all()
     return render_template('dashboard_admin.html', users=users, orders=orders)
+
+@app.route('/wishlist')
+@login_required
+def wishlist():
+    if current_user.role != 'buyer':
+        return redirect(url_for('index'))
+    wishlist_items = Wishlist.query.filter_by(user_id=current_user.id).all()
+    return render_template('wishlist.html', wishlist_items=wishlist_items)
+
+@app.route('/wishlist/tambah/<int:product_id>')
+@login_required
+def wishlist_tambah(product_id):
+    if current_user.role != 'buyer':
+        return redirect(url_for('index'))
+    
+    existing = Wishlist.query.filter_by(user_id=current_user.id, product_id=product_id).first()
+    if existing:
+        flash('Produk sudah ada di wishlist', 'info')
+    else:
+        wishlist_item = Wishlist(user_id=current_user.id, product_id=product_id)
+        db.session.add(wishlist_item)
+        db.session.commit()
+        flash('Ditambahkan ke wishlist', 'success')
+    return redirect(url_for('wishlist'))
+
+@app.route('/wishlist/hapus/<int:product_id>')
+@login_required
+def wishlist_hapus(product_id):
+    item = Wishlist.query.filter_by(user_id=current_user.id, product_id=product_id).first()
+    if item:
+        db.session.delete(item)
+        db.session.commit()
+        flash('Dihapus dari wishlist', 'success')
+    return redirect(url_for('wishlist'))
+
+@app.route('/produk/<int:product_id>/review', methods=['GET', 'POST'])
+@login_required
+def produk_review(product_id):
+    if current_user.role != 'buyer':
+        return redirect(url_for('index'))
+    
+    product = Product.query.get_or_404(product_id)
+    
+    existing_review = Review.query.filter_by(product_id=product_id, buyer_id=current_user.id).first()
+    if existing_review:
+        flash('Anda sudah pernah memberi review', 'info')
+        return redirect(url_for('index'))
+    
+    purchased = OrderItem.query.filter_by(product_id=product_id).join(Order).filter(Order.buyer_id == current_user.id).first()
+    if not purchased:
+        flash('Anda harus membeli produk ini terlebih dahulu untuk memberi review', 'warning')
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        rating = int(request.form.get('rating', 0))
+        komentar = request.form.get('komentar', '').strip()
+        
+        if rating < 1 or rating > 5:
+            flash('Rating harus 1-5', 'danger')
+            return redirect(url_for('produk_review', product_id=product_id))
+        
+        review = Review(product_id=product_id, buyer_id=current_user.id, rating=rating, komentar=komentar)
+        db.session.add(review)
+        db.session.commit()
+        flash('Review berhasil ditambahkan', 'success')
+        return redirect(url_for('index'))
+    
+    return render_template('review.html', product=product)

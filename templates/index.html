@@ -53,19 +53,44 @@
             <div class="card-body">
                 <h5 class="card-title fw-bold">{{ p.name }}</h5>
                 <p class="card-text small mb-2">
-                    <span class="badge-primary">{{ p.jenis }}</span>
+                    <span class="badge bg-secondary">{{ p.jenis }}</span>
                     <span class="text-muted"> | {{ p.berat_kg }} kg</span>
                 </p>
-                <h4 class="text-accent fw-bold">Rp {{ "{:,}".format(p.harga) }}</h4>
+                <h4 class="text-entok fw-bold">Rp {{ "{:,}".format(p.harga) }}</h4>
+                {% if p.stok > 0 %}
+                <p class="small text-success mb-2"><i class="bi bi-check-circle"></i> Stok: {{ p.stok }}</p>
+                {% else %}
+                <p class="small text-danger mb-2"><i class="bi bi-x-circle"></i> Stok Habis</p>
+                {% endif %}
+                {% if p.reviews %}
+                <p class="small mb-1">
+                    {% for i in range(5) %}{% if i < ((p.reviews|sum(attribute='rating')) / p.reviews|length)|round|int %}★{% else %}☆{% endif %}{% endfor %}
+                    <span class="text-muted">({{ p.reviews|length }})</span>
+                </p>
+                {% endif %}
                 <p class="small text-muted">{{ p.deskripsi[:60] if p.deskripsi else '' }}...</p>
                 <small class="text-muted"><i class="bi bi-person"></i> {{ p.seller.username }}</small>
             </div>
             {% if current_user.is_authenticated and current_user.role == 'buyer' %}
             <div class="card-footer bg-white border-0">
-                <form action="/keranjang/tambah/{{ p.id }}" method="POST" class="d-flex">
-                    <input type="number" name="jumlah" value="1" min="1" class="form-control form-control-sm" style="width: 70px;">
-                    <button class="btn btn-entok btn-sm ms-2"><i class="bi bi-cart-plus"></i> Tambah</button>
-                </form>
+                <div class="d-flex justify-content-between align-items-center">
+                    {% if p.stok > 0 %}
+                    <form action="/keranjang/tambah/{{ p.id }}" method="POST" class="d-flex">
+                        <input type="number" name="jumlah" value="1" min="1" max="{{ p.stok }}" class="form-control form-control-sm" style="width: 70px;">
+                        <button class="btn btn-entok btn-sm ms-2"><i class="bi bi-cart-plus"></i> Tambah</button>
+                    </form>
+                    {% else %}
+                    <button class="btn btn-secondary btn-sm" disabled>Stok Habis</button>
+                    {% endif %}
+                    <div class="btn-group">
+                        <a href="/wishlist/tambah/{{ p.id }}" class="btn btn-outline-secondary btn-sm" title="Wishlist">
+                            <i class="bi bi-heart"></i>
+                        </a>
+                        <a href="/produk/{{ p.id }}/review" class="btn btn-outline-warning btn-sm" title="Review">
+                            <i class="bi bi-star"></i>
+                        </a>
+                    </div>
+                </div>
             </div>
             {% endif %}
         </div>
