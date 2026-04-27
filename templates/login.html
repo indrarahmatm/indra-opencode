@@ -10,6 +10,7 @@
                 <p class="text-muted">Silakan login untuk melanjutkan</p>
             </div>
             <form method="POST">
+                {{ csrf_token() }}
                 <div class="mb-3">
                     <label class="form-label">Email</label>
                     <input type="email" name="email" class="form-control" placeholder="email@example.com" required>
@@ -20,9 +21,6 @@
                 </div>
                 <button type="submit" class="btn btn-entok w-100 py-2">Login</button>
             </form>
-            <div class="text-center mt-3">
-                <a href="{{ url_for('lupa_password') }}" class="text-muted small">Lupa password?</a>
-            </div>
             <p class="text-center mt-4 mb-0">
                 Belum punya akun? <a href="/register" class="text-primary fw-bold">Daftar</a>
             </p>

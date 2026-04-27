@@ -2,6 +2,9 @@ import os
 from flask import Flask
 from flask_login import LoginManager
 from flask_mail import Mail
+from flask_wtf import CSRFProtect
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', os.urandom(32).hex())
@@ -23,7 +26,21 @@ app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', '')
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', '')
 app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', 'noreply@entokmart.com')
 
+# Rate limiting
+app.config['RATELIMIT_STORAGE_URL'] = 'memory://'
+app.config['RATELIMIT_STRATEGY'] = 'fixed-window'
+app.config['RATELIMIT_DEFAULT'] = '200 per day'
+app.config['RATELIMIT_HEADERS_ENABLED'] = True
+
 mail = Mail(app)
+csrf = CSRFProtect(app)
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://",
+)
+
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 from models import db, User, Category

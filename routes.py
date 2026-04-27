@@ -1,11 +1,52 @@
 import re
 import os
 from datetime import datetime
-from flask import render_template, redirect, url_for, request, flash, send_from_directory
+from flask import render_template, redirect, url_for, request, flash, send_from_directory, session
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.utils import secure_filename
 from app import app, mail, db
 from models import User, Product, Order, OrderItem, Review, Wishlist, Category, ProductImage, Chat
+
+# ======================
+# TELEGRAM INTEGRATION
+# ======================
+TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '8651533615:AAFsvHHS3_XbS0WqNk42G-z8I763q_n2A-w')
+TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID', '6054204698')
+TELEGRAM_API_URL = f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}'
+
+def telegram_send_message(text):
+    try:
+        import requests as req
+        data = {'chat_id': TELEGRAM_CHAT_ID, 'text': text, 'parse_mode': 'HTML'}
+        req.post(f'{TELEGRAM_API_URL}/sendMessage', data=data, timeout=10)
+        return True
+    except Exception as e:
+        app.logger.error(f'Telegram error: {e}')
+        return False
+
+def telegram_notify_order(order, event_type='new'):
+    if event_type == 'new':
+        msg = f"""<b>🛒 PESANAN BARU #{order.id}</b>
+
+<b>Pembeli:</b> {order.buyer.username}
+<b>Total:</b> Rp {order.total_harga:,}
+<b>Pembayaran:</b> {order.payment_method.upper()}
+<a href="http://127.0.0.1:5003/pesanan">➡️ Proses Pesanan</a>"""
+    else:
+        msg = f"""<b>📦 UPDATE PESANAN #{order.id}</b>
+
+<b>Status:</b> {order.status.upper()}
+<b>Total:</b> Rp {order.total_harga:,}
+<a href="http://127.0.0.1:5003/pesanan-saya">➡️ Lihat Detail</a>"""
+    return telegram_send_message(msg)
+
+def telegram_notify_chat(username, pesan):
+    msg = f"""<b>💬 CHAT BARU dari {username}</b>
+
+{pesan}
+
+<a href="http://127.0.0.1:5003/chat">➡️ Balas di EntokMart</a>"""
+    return telegram_send_message(msg)
 
 def sanitize_input(text):
     if text:
@@ -431,6 +472,9 @@ def checkout():
         except Exception:
             pass
         
+        # Telegram notification
+        telegram_notify_order(order, 'new')
+        
         flash(f'Pesanan berhasil dibuat! ({payment_method.upper()})', 'success')
         return redirect(url_for('pesanan_saya'))
 
@@ -818,6 +862,10 @@ def chat_kirim():
     chat = Chat(user_id=current_user.id, pesan=pesan, is_from_admin=False)
     db.session.add(chat)
     db.session.commit()
+    
+    # Telegram notification to admin
+    telegram_notify_chat(current_user.username, pesan)
+    
     flash('Pesan terkirim', 'success')
     return redirect(url_for('chat'))
 
@@ -879,3 +927,39 @@ def produk_review(product_id):
         return redirect(url_for('index'))
     
     return render_template('review.html', product=product)
+# ======================
+# TELEGRAM INTEGRATION
+# ======================
+import requests as req
+
+TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '7157068412:AAEkomBO_qCBW7SfUvblefqJ-WL6m8TZluk')
+TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID', '6054204698')
+TELEGRAM_API_URL = f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}'
+
+def telegram_send_message(text):
+    try:
+        data = {
+            'chat_id': TELEGRAM_CHAT_ID,
+            'text': text,
+            'parse_mode': 'HTML'
+        }
+        req.post(f'{TELEGRAM_API_URL}/sendMessage', data=data, timeout=10)
+        return True
+    except Exception as e:
+        app.logger.error(f'Telegram send error: {e}')
+        return False
+
+def format_telegram_pesanan(order):
+    return f"""
+<b>🛒 Pesanan Baru #${order.id}</b>
+
+<b>Pembeli:</b> {order.buyer.username}
+<b>Total:</b> Rp {order.total_harga:,}
+<b>Metode:</b> {order.payment_method.upper()}
+<b>Status:</b> {order.status}
+
+<a href="http://127.0.0.1:5003/pesanan">Lihat di EntokMart</a>
+"""
+
+def format_telegram_chat(username, pesan):
+    return f"<b>💬 Chat dari {username}:</b>\n{pesan}\n\n<a href=\"http://127.0.0.1:5003/chat\">Balas di EntokMart</a>"
