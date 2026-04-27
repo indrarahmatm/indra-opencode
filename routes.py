@@ -48,6 +48,70 @@ def telegram_notify_chat(username, pesan):
 <a href="http://127.0.0.1:5003/chat">➡️ Balas di EntokMart</a>"""
     return telegram_send_message(msg)
 
+@app.route('/api/telegram/reply', methods=['POST'])
+def telegram_api_reply():
+    """API endpoint for Telegram bot to send admin replies to chat"""
+    data = request.get_json()
+    if not data:
+        return {'error': 'No data'}, 400
+    
+    user_id = data.get('user_id')
+    message = data.get('message')
+    
+    if not user_id or not message:
+        return {'error': 'Missing user_id or message'}, 400
+    
+    # Find the user
+    user = User.query.get(user_id)
+    if not user:
+        return {'error': 'User not found'}, 404
+    
+    # Save admin reply to chat
+    chat = Chat(user_id=user_id, pesan=message, is_from_admin=True)
+    db.session.add(chat)
+    db.session.commit()
+    
+    return {'success': True, 'message': 'Reply sent'}
+
+@app.route('/api/telegram/chat', methods=['POST'])
+def telegram_api_chat():
+    """API endpoint for Telegram bot to receive user messages"""
+    data = request.get_json()
+    if not data:
+        return {'error': 'No data'}, 400
+    
+    user_id = data.get('user_id')
+    message = data.get('message')
+    username = data.get('username', 'Telegram User')
+    
+    if not user_id or not message:
+        return {'error': 'Missing user_id or message'}, 400
+    
+    # Find or create user based on Telegram user_id
+    # For now, we'll create a temporary user mapping or use existing user
+    user = User.query.filter_by(email=f'tg_{user_id}@telegram.local').first()
+    
+    if not user:
+        # Create a temporary user for Telegram
+        user = User(
+            username=username,
+            email=f'tg_{user_id}@telegram.local',
+            role='buyer'
+        )
+        user.set_password('telegram_user')
+        db.session.add(user)
+        db.session.commit()
+    
+    # Save chat message
+    chat = Chat(user_id=user.id, pesan=message, is_from_admin=False)
+    db.session.add(chat)
+    db.session.commit()
+    
+    # Notify admin via Telegram
+    telegram_notify_chat(username, message)
+    
+    return {'success': True, 'message': 'Chat received'}
+
 def sanitize_input(text):
     if text:
         return re.sub(r'[<>\'\";]', '', str(text))
