@@ -2,10 +2,25 @@
 {% block title %}Pesanan Saya - EntokMart{% endblock %}
 {% block content %}
 <h2 class="mb-4"><i class="bi bi-bag-check"></i> Pesanan Saya</h2>
+
+<div class="alert alert-info mb-4">
+    <strong><i class="bi bi-info-circle"></i> Status Pesanan:</strong>
+    <div class="mt-2">
+        <span class="badge bg-secondary">Pending</span> →
+        <span class="badge bg-warning text-dark">Diproses</span> →
+        <span class="badge bg-info">Dikirim</span> →
+        <span class="badge bg-success">Selesai</span>
+    </div>
+</div>
+
 {% for order in orders %}
 <div class="card mb-3">
 <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <span><strong>Order #{{ order.id }}</strong> <small class="text-muted">{{ order.created_at.strftime('%d-%m-%Y %H:%M') }}</small></span>
+        <span>
+            <strong>Order #{{ order.id }}</strong>
+            <span class="badge bg-{% if order.status == 'selesai' %}success{% elif order.status == 'dikirim' %}info{% elif order.status == 'diproses' %}warning{% else %}secondary{% endif %}">{{ order.status }}</span>
+            <small class="text-muted ms-2">{{ order.created_at.strftime('%d-%m-%Y %H:%M') }}</small>
+        </span>
         <a href="{{ url_for('pesanan_detail', order_id=order.id) }}" class="btn btn-sm btn-outline-primary">Detail</a>
     </div>
     <div class="card-body">
@@ -42,11 +57,28 @@
                     {% if order.resi %}
                     <p class="mb-0 small">No. Resi: <strong>{{ order.resi }}</strong></p>
                     {% else %}
-                    <p class="mb-0 small text-muted">Resi belum ada</p>
+                    <p class="mb-0 small text-muted">Resi akan diberikan setelah pesanan dikirim</p>
                     {% endif %}
                 </div>
             </div>
         </div>
+        
+        {% if order.status == 'dikirim' %}
+        <div class="alert alert-info mt-3">
+            <i class="bi bi-truck"></i> <strong>Pesanan dalam pengiriman!</strong>
+            <p class="mb-0 small">No. Resi: <strong>{{ order.resi }}</strong>. Tunggu pesanan sampai di alamat Anda.</p>
+        </div>
+        {% elif order.status == 'diproses' %}
+        <div class="alert alert-warning mt-3">
+            <i class="bi bi-gear"></i> <strong>Pesanan sedang diproses</strong>
+            <p class="mb-0 small">Seller sedang menyiapkan pesanan Anda. Mohon tunggu konfirmasi selanjutnya.</p>
+        </div>
+        {% elif order.status == 'selesai' %}
+        <div class="alert alert-success mt-3">
+            <i class="bi bi-check-circle"></i> <strong>Pesanan selesai!</strong>
+            <p class="mb-0 small">Terima kasih telah berbelanja di EntokMart. Silakan berikan review untuk produk yang dibeli.</p>
+        </div>
+        {% endif %}
     </div>
     <div class="card-footer bg-white">
         <div class="row">

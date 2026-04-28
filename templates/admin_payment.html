@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kelola Payment Gateway - EntokMart Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f5f5f5; }
+        .sidebar { background: #2E7D32; min-height: 100vh; }
+        .sidebar a { color: white; text-decoration: none; padding: 12px 20px; display: block; }
+        .sidebar a:hover { background: #1B5E20; }
+        .sidebar a.active { background: #1B5E20; border-left: 4px solid #fff; }
+        .main-content { padding: 20px; }
+        .card { border: none; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .card-header { background: #2E7D32; color: white; border-radius: 10px 10px 0 0 !important; }
+        .status-badge { padding: 5px 10px; border-radius: 20px; font-size: 12px; }
+        .status-enabled { background: #4CAF50; color: white; }
+        .status-disabled { background: #f44336; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-2 sidebar p-0">
+                <div class="p-3 text-center border-bottom border-secondary">
+                    <h5 class="text-white">EntokMart</h5>
+                    <small class="text-light">Admin Panel</small>
+                </div>
+                <a href="/admin"><i class="fas fa-home me-2"></i> Dashboard</a>
+                <a href="/admin/users"><i class="fas fa-users me-2"></i> Kelola User</a>
+                <a href="/admin/sellers"><i class="fas fa-store me-2"></i> Kelola Seller</a>
+                <a href="/admin/categories"><i class="fas fa-tags me-2"></i> Kelola Kategori</a>
+                <a href="/admin/shipping"><i class="fas fa-truck me-2"></i> Kelola Ongkir</a>
+                <a href="/admin/payment" class="active"><i class="fas fa-credit-card me-2"></i> Kelola Payment</a>
+                <a href="/logout"><i class="fas fa-sign-out-alt me-2"></i> Logout</a>
+            </div>
+            
+            <!-- Main Content -->
+            <div class="col-md-10 main-content">
+                <h3 class="mb-4"><i class="fas fa-credit-card me-2"></i>Kelola Payment Gateway</h3>
+                
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+                
+                <!-- Status Card -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Status Payment Gateway</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="text-center p-3 rounded" style="background: {{ '#e8f5e9' if midtrans_enabled else '#ffebee' }}">
+                                    <h4>Midtrans</h4>
+                                    <span class="status-badge {{ 'status-enabled' if midtrans_enabled else 'status-disabled' }}">
+                                        {{ 'Aktif' if midtrans_enabled else 'Nonaktif' }}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="col-md-8">
+                                <p class="text-muted">
+                                    {% if midtrans_enabled %}
+                                        Payment gateway Midtrans sudah aktif. Pelanggan dapat melakukan pembayaran melalui berbagai metode.
+                                    {% else %}
+                                        Konfigurasi Midtrans untuk mengaktifkan pembayaran online.
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Midtrans Configuration -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-cog me-2"></i>Konfigurasi Midtrans</h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" action="{{ url_for('admin_save_midtrans') }}">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Server Key</label>
+                                    <input type="text" class="form-control" name="server_key" 
+                                           value="{{ midtrans_server_key }}" placeholder="Masukkan Server Key">
+                                    <small class="text-muted">Dapatkan dari dashboard Midtrans</small>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Client Key</label>
+                                    <input type="text" class="form-control" name="client_key" 
+                                           value="{{ midtrans_client_key }}" placeholder="Masukkan Client Key">
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Mode</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="production" 
+                                           id="sandbox" value="false" {{ 'checked' if not midtrans_production else '' }}>
+                                    <label class="form-check-label" for="sandbox">
+                                        <span class="badge bg-warning">Sandbox</span> Testing (Tidak dengan uang asli)
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="production" 
+                                           id="production" value="true" {{ 'checked' if midtrans_production else '' }}>
+                                    <label class="form-check-label" for="production">
+                                        <span class="badge bg-success">Production</span> Gunakan uang asli
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-save me-2"></i>Simpan Konfigurasi
+                            </button>
+                        </form>
+                        
+                        <hr>
+                        
+                        <h6 class="mb-3">Cara Mendapatkan Kunci Midtrans:</h6>
+                        <ol class="text-muted">
+                            <li>Kunjungi <a href="https://dashboard.midtrans.com" target="_blank">dashboard.midtrans.com</a></li>
+                            <li>Login atau daftar akun baru</li>
+                            <li>Pilih environment (Sandbox/Production)</li>
+                            <li>Ke menu Settings → Access Keys</li>
+                            <li>Salin Server Key dan Client Key</li>
+                            <li>Tempelkan di form di atas</li>
+                        </ol>
+                    </div>
+                </div>
+                
+                <!-- Payment Methods Info -->
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-list me-2"></i>Metode Pembayaran Tersedia</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3 text-center p-3">
+                                <i class="fas fa-credit-card fa-2x text-primary"></i>
+                                <p class="mt-2">Kartu Kredit</p>
+                            </div>
+                            <div class="col-md-3 text-center p-3">
+                                <i class="fas fa-university fa-2x text-info"></i>
+                                <p class="mt-2">Virtual Account (BNI, BCA, BRI)</p>
+                            </div>
+                            <div class="col-md-3 text-center p-3">
+                                <i class="fas fa-store fa-2x text-warning"></i>
+                                <p class="mt-2">Convenience Store (Alfamart, Indomaret)</p>
+                            </div>
+                            <div class="col-md-3 text-center p-3">
+                                <i class="fas fa-mobile-alt fa-2x text-success"></i>
+                                <p class="mt-2">E-Wallet (ShopeePay)</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

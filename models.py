@@ -14,6 +14,7 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(150), unique=True, nullable=False)
     password_hash = db.Column(db.String(200), nullable=False)
     role = db.Column(db.String(20), nullable=False)
+    is_approved = db.Column(db.Boolean, default=False)
     
     # Vendor/Store fields
     nama_toko = db.Column(db.String(150), nullable=True)
@@ -94,7 +95,61 @@ class Category(db.Model):
             if not Category.query.filter_by(slug=d['slug']).first():
                 cat = Category(**d)
                 db.session.add(cat)
+
+
+class ShippingCourier(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), nullable=False)
+    slug = db.Column(db.String(50), nullable=False, unique=True)
+    logo = db.Column(db.String(200))
+    is_active = db.Column(db.Boolean, default=True)
+    description = db.Column(db.String(200))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class ShippingZone(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    zone_code = db.Column(db.String(20), nullable=False, unique=True)
+    base_cost = db.Column(db.Integer, default=0)
+    cost_per_kg = db.Column(db.Integer, default=0)
+    estimated_days = db.Column(db.String(50))
+    is_active = db.Column(db.Boolean, default=True)
+
+
+class FreeShippingPromo(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    minpurchase = db.Column(db.Integer, default=0)
+    max_discount = db.Column(db.Integer, default=0)
+    is_active = db.Column(db.Boolean, default=True)
+    start_date = db.Column(db.DateTime)
+    end_date = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class Setting(db.Model):
+    """App settings stored in database"""
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(50), unique=True, nullable=False)
+    value = db.Column(db.Text)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    @staticmethod
+    def get(key, default=''):
+        s = Setting.query.filter_by(key=key).first()
+        return s.value if s else default
+    
+    @staticmethod
+    def set(key, value):
+        s = Setting.query.filter_by(key=key).first()
+        if s:
+            s.value = value
+        else:
+            s = Setting(key=key, value=value)
+            db.session.add(s)
         db.session.commit()
+
 
 class Chat(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -123,6 +178,9 @@ class Order(db.Model):
     # Shipping
     resi = db.Column(db.String(50))
     ongkir = db.Column(db.Integer, default=0)
+    # Seller payment
+    seller_paid = db.Column(db.Boolean, default=False)
+    seller_paid_at = db.Column(db.DateTime)
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

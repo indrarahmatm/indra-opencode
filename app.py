@@ -26,6 +26,17 @@ app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', '')
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', '')
 app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', 'noreply@entokmart.com')
 
+# RajaOngkir API
+app.config['RAJAONGKIR_API_KEY'] = 'GVcELgoo900bfa223a9d68a4IAn4c8Rx'
+app.config['RAJAONGKIR_BASE_URL'] = 'https://rajaongkir.komerce.id/api/v1'
+
+# Midtrans Payment Gateway
+app.config['MIDTRANS_SERVER_KEY'] = os.environ.get('MIDTRANS_SERVER_KEY', '')
+app.config['MIDTRANS_CLIENT_KEY'] = os.environ.get('MIDTRANS_CLIENT_KEY', '')
+app.config['MIDTRANS_IS_PRODUCTION'] = os.environ.get('MIDTRANS_IS_PRODUCTION', 'false').lower() == 'true'
+app.config['MIDTRANS_SNAP_URL'] = 'https://app.snap-midtrans.com/snap/v1'
+app.config['MIDTRANS_API_URL'] = 'https://api.midtrans.com/v2'
+
 # Rate limiting
 app.config['RATELIMIT_STORAGE_URL'] = 'memory://'
 app.config['RATELIMIT_STRATEGY'] = 'fixed-window'

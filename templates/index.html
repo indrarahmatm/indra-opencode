@@ -3,7 +3,7 @@
 <div class="hero-section text-center py-5">
     <div class="py-4">
         <h1 class="display-4 fw-bold mb-3">Selamat Datang di EntokMart</h1>
-        <p class="lead mb-4">Marketplace terpercaya untuk beli/jual entok优质</p>
+        <p class="lead mb-4">Marketplace terpercaya untuk transaksi Jual - Beli segala jenis entok</p>
         <a href="/register" class="btn btn-entok btn-lg"><i class="bi bi-shop"></i> Mulai Jual Entok</a>
     </div>
 </div>
@@ -92,32 +92,34 @@
                 <p class="small text-muted">{{ p.deskripsi[:60] if p.deskripsi else '' }}...</p>
                 <small class="text-muted"><i class="bi bi-person"></i> {{ p.seller.username }}</small>
             </div>
-            {% if current_user.is_authenticated and current_user.role == 'buyer' %}
-            <div class="card-footer bg-white border-0">
-                <div class="d-flex justify-content-between align-items-center">
-                    {% if p.stok > 0 %}
-                    <form action="{{ url_for('keranjang_tambah', product_id=p.id) }}" method="POST" class="d-flex">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <input type="number" name="jumlah" value="1" min="1" max="{{ p.stok }}" class="form-control form-control-sm" style="width: 70px;">
-                        <button class="btn btn-entok btn-sm ms-2"><i class="bi bi-cart-plus"></i> Tambah</button>
-                    </form>
-                    {% else %}
-                    <button class="btn btn-secondary btn-sm" disabled>Stok Habis</button>
-                    {% endif %}
-                    <div class="btn-group">
-                        <a href="/wishlist/tambah/{{ p.id }}" class="btn btn-outline-secondary btn-sm" title="Wishlist">
-                            <i class="bi bi-heart"></i>
-                        </a>
-                        <a href="/produk/compare/{{ p.id }}" class="btn btn-outline-info btn-sm" title="Bandingkan">
-                            <i class="bi bi-arrow-left-right"></i>
-                        </a>
-                        <a href="/produk/{{ p.id }}/review" class="btn btn-outline-warning btn-sm" title="Review">
-                            <i class="bi bi-star"></i>
-                        </a>
-                    </div>
-                </div>
-            </div>
-            {% endif %}
+             {% if current_user.is_authenticated and current_user.role == 'buyer' %}
+             <div class="card-footer bg-white border-0">
+                 <div class="d-flex justify-content-between align-items-center">
+                     <div>
+                         {% if p.stok > 0 %}
+                         <form action="{{ url_for('keranjang_tambah', product_id=p.id) }}" method="POST" class="d-flex">
+                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                             <input type="number" name="jumlah" value="1" min="1" max="{{ p.stok }}" class="form-control form-control-sm" style="width: 60px;">
+                             <button class="btn btn-entok btn-sm"><i class="bi bi-cart-plus"></i> Tambah</button>
+                         </form>
+                         {% else %}
+                         <button class="btn btn-secondary btn-sm" disabled>Stok Habis</button>
+                         {% endif %}
+                     </div>
+                     <div class="btn-group">
+                         <a href="/wishlist/tambah/{{ p.id }}" class="btn btn-outline-secondary btn-sm" title="Wishlist">
+                             <i class="bi bi-heart"></i>
+                         </a>
+                         <a href="/produk/compare/{{ p.id }}" class="btn btn-outline-info btn-sm" title="Bandingkan">
+                             <i class="bi bi-arrow-left-right"></i>
+                         </a>
+                         <a href="/produk/{{ p.id }}/review" class="btn btn-outline-warning btn-sm" title="Review">
+                             <i class="bi bi-star"></i>
+                         </a>
+                     </div>
+                 </div>
+             </div>
+             {% endif %}
         </div>
     </div>
     {% else %}

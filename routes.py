@@ -1,12 +1,17 @@
 import re
 import os
 import io
+import requests
 from datetime import datetime, timedelta
-from flask import render_template, redirect, url_for, request, flash, send_from_directory, session, make_response
+from flask import render_template, redirect, url_for, request, flash, send_from_directory, session, make_response, jsonify
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.utils import secure_filename
 from app import app, mail, db, csrf
-from models import User, Product, Order, OrderItem, Review, Wishlist, Category, ProductImage, Chat
+from models import User, Product, Order, OrderItem, Review, Wishlist, Category, ProductImage, Chat, ShippingCourier, ShippingZone, FreeShippingPromo, Setting
+from services.midtrans import (
+    is_midtrans_enabled, create_snap_token, check_transaction_status,
+    get_payment_methods, get_midtrans_status_from_code
+)
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -14,6 +19,93 @@ from reportlab.lib.units import inch, mm
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+
+# ======================
+# RAJAONGKIR INTEGRATION
+# ======================
+def get_rajaongkir_api_key():
+    """Get API key from database or config"""
+    key = Setting.get('rajaongkir_api_key')
+    if not key:
+        key = app.config.get('RAJAONGKIR_API_KEY', '')
+    return key
+
+RAJAONGKIR_BASE_URL = app.config.get('RAJAONGKIR_BASE_URL', 'https://rajaongkir.komerce.id/api/v1')
+
+def get_rajaongkir_provinces():
+    api_key = get_rajaongkir_api_key()
+    if not api_key:
+        return []
+    try:
+        response = requests.get(f'{RAJAONGKIR_BASE_URL}/master/region/province', 
+                                headers={'key': api_key}, timeout=10)
+        if response.status_code == 200:
+            return response.json().get('data', [])
+    except Exception as e:
+        print(f'RajaOngkir error: {e}')
+    return []
+
+def get_rajaongkir_cities(province_id=None):
+    api_key = get_rajaongkir_api_key()
+    if not api_key:
+        return []
+    try:
+        url = f'{RAJAONGKIR_BASE_URL}/master/region/city'
+        params = {'province': province_id} if province_id else {}
+        response = requests.get(url, headers={'key': api_key}, params=params, timeout=10)
+        if response.status_code == 200:
+            return response.json().get('data', [])
+    except Exception as e:
+        print(f'RajaOngkir error: {e}')
+    return []
+
+def get_rajaongkir_cost(origin, destination, weight, courier):
+    api_key = get_rajaongkir_api_key()
+    if not api_key:
+        return []
+    try:
+        response = requests.post(
+            f'{RAJAONGKIR_BASE_URL}/calculate/domestic-cost',
+            headers={'key': api_key, 'Content-Type': 'application/json'},
+            json={
+                'origin': str(origin),
+                'destination': str(destination),
+                'weight': int(weight),
+                'courier': courier
+            },
+            timeout=10
+        )
+        if response.status_code == 200:
+            return response.json().get('data', [])
+    except Exception as e:
+        print(f'RajaOngkir cost error: {e}')
+    return []
+
+def get_default_shipping_cost(weight_kg):
+    """Fallback calculation if RajaOngkir fails"""
+    if weight_kg <= 0:
+        return 0
+    # Default: 5000 dasar + 3000 per kg
+    return int(5000 + max(0, (weight_kg - 1) * 3000))
+
+def calculate_shipping_cost(weight_kg, zone_code):
+    """Calculate shipping cost based on zone"""
+    if weight_kg <= 0:
+        return 0
+    
+    # Get active zone from database
+    zone = ShippingZone.query.filter_by(zone_code=zone_code, is_active=True).first()
+    
+    if zone:
+        # Zone-based calculation: base_cost + (weight * cost_per_kg)
+        return int(zone.base_cost + (weight_kg * zone.cost_per_kg))
+    else:
+        # Fallback to default calculation
+        return get_default_shipping_cost(weight_kg)
+
+def get_available_zones():
+    """Get all active shipping zones"""
+    return ShippingZone.query.filter_by(is_active=True).all()
 
 # ======================
 # TELEGRAM INTEGRATION
@@ -120,6 +212,33 @@ def telegram_api_chat():
     telegram_notify_chat(username, message)
     
     return {'success': True, 'message': 'Chat received'}
+
+# ======================
+# RAJAONGKIR API ROUTES
+# ======================
+@app.route('/api/rajaongkir/provinces')
+def api_rajaongkir_provinces():
+    provinces = get_rajaongkir_provinces()
+    return {'success': True, 'data': provinces}
+
+@app.route('/api/rajaongkir/cities')
+def api_rajaongkir_cities():
+    province_id = request.args.get('province_id')
+    cities = get_rajaongkir_cities(province_id)
+    return {'success': True, 'data': cities}
+
+@app.route('/api/rajaongkir/cost', methods=['POST'])
+def api_rajaongkir_cost():
+    origin = request.form.get('origin', '23')
+    destination = request.form.get('destination')
+    weight = int(request.form.get('weight', 1000))
+    courier = request.form.get('courier', 'jne')
+    
+    if not destination:
+        return {'success': False, 'message': 'Destination required'}
+    
+    costs = get_rajaongkir_cost(origin, destination, weight, courier)
+    return {'success': True, 'data': costs}
 
 def sanitize_input(text):
     if text:
@@ -259,6 +378,11 @@ def login():
         user = User.query.filter_by(email=email).first()
 
         if user and user.check_password(password):
+            # Check approval for non-admin users
+            if user.role != 'admin' and not user.is_approved:
+                flash('Akun Anda belum disetujui oleh admin. Silakan hubungi admin.', 'warning')
+                return render_template('login.html')
+            
             login_user(user, remember=True)
             flash('Login berhasil', 'success')
             if user.role == 'peternak':
@@ -343,7 +467,7 @@ def toko(username):
 @app.route('/toko/edit', methods=['GET', 'POST'])
 @login_required
 def toko_edit():
-    if current_user.role != 'peternak':
+    if current_user.role not in ['peternak', 'admin']:
         return redirect(url_for('index'))
     
     if request.method == 'POST':
@@ -593,12 +717,15 @@ def checkout():
                 subtotal += product.harga * item['jumlah']
                 total_weight_kg += product.berat_kg * item['jumlah']
         
-        # Calculate shipping cost (ongkir)
-        if total_weight_kg <= 0:
-            ongkir = 0
+        # Calculate shipping cost (ongkir) - use zones
+        selected_zone = request.form.get('shipping_zone', '')
+        
+        if total_weight_kg > 0 and selected_zone:
+            # Calculate using zone
+            ongkir = calculate_shipping_cost(total_weight_kg, selected_zone)
         else:
-            # Base cost 5000 for first kg, then 3000 per additional kg
-            ongkir = int(5000 + max(0, (total_weight_kg - 1) * 3000))
+            # Fallback to default calculation
+            ongkir = get_default_shipping_cost(total_weight_kg)
         
         # Total harga includes ongkir
         total_harga = subtotal + ongkir
@@ -725,7 +852,8 @@ def checkout():
     total_harga = subtotal + ongkir
     
     # GET request - display checkout form with totals
-    return render_template('checkout.html', subtotal=subtotal, ongkir=ongkir, total=total_harga)
+    zones = get_available_zones()
+    return render_template('checkout.html', subtotal=subtotal, ongkir=ongkir, total=total_harga, zones=zones)
 
 @app.route('/pesanan-saya')
 @login_required
@@ -917,18 +1045,28 @@ def bukti_transfer(order_id):
 @app.route('/pesanan')
 @login_required
 def pesanan():
-    if current_user.role != 'peternak':
+    if current_user.role not in ['peternak', 'admin']:
         return redirect(url_for('index'))
-    items = OrderItem.query.filter_by(nama_peternak=current_user.username).all()
+    
+    # Admin sees all orders, seller sees their orders
+    if current_user.role == 'admin':
+        items = OrderItem.query.join(Order).all()
+    else:
+        items = OrderItem.query.filter_by(nama_peternak=current_user.username).all()
+    
     return render_template('pesanan.html', items=items)
 
 @app.route('/laporan')
 @login_required
 def laporan():
-    if current_user.role != 'peternak':
+    if current_user.role not in ['peternak', 'admin']:
         return redirect(url_for('index'))
     
-    items = OrderItem.query.filter_by(nama_peternak=current_user.username).all()
+    # Admin sees all orders, seller sees their orders
+    if current_user.role == 'admin':
+        items = OrderItem.query.join(Order).all()
+    else:
+        items = OrderItem.query.filter_by(nama_peternak=current_user.username).all()
     
     total_pesanan = len(items)
     total_pendapatan = sum(item.harga_saat_beli * item.jumlah for item in items)
@@ -1016,7 +1154,7 @@ def lupa_password():
 @app.route('/pesanan/update/<int:id>', methods=['POST'])
 @login_required
 def pesanan_update(id):
-    if current_user.role != 'peternak':
+    if current_user.role not in ['peternak', 'admin']:
         return redirect(url_for('index'))
     
     order = Order.query.get(id)
@@ -1071,6 +1209,29 @@ def lihat_bukti_transfer(order_id):
     
     return render_template('lihat_bukti.html', order=order)
 
+@app.route('/pesanan/bayar-seller/<int:order_id>', methods=['POST'])
+@login_required
+def bayarkan_ke_seller(order_id):
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    
+    order = Order.query.get_or_404(order_id)
+    
+    if order.status != 'selesai':
+        flash('Pesanan harus berstatus Selesai baru bisa dibayarkan ke seller', 'warning')
+        return redirect(url_for('pesanan'))
+    
+    if order.seller_paid:
+        flash('Pesanan sudah dibayarkan ke seller', 'info')
+        return redirect(url_for('pesanan'))
+    
+    order.seller_paid = True
+    order.seller_paid_at = datetime.utcnow()
+    db.session.commit()
+    
+    flash(f'Pembayaran ke seller untuk order #{order.id} telah dikonfirmasi', 'success')
+    return redirect(url_for('pesanan'))
+
 @app.route('/admin')
 @login_required
 def dashboard_admin():
@@ -1115,6 +1276,439 @@ def dashboard_admin():
     
     return render_template('dashboard_admin.html', users=users, orders=orders, stats=stats)
 
+@app.route('/admin/approve/<int:id>', methods=['POST'])
+@login_required
+def admin_approve_user(id):
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    
+    user = User.query.get_or_404(id)
+    user.is_approved = True
+    db.session.commit()
+    flash(f'Akun {user.username} telah disetujui', 'success')
+    return redirect(url_for('dashboard_admin'))
+
+@app.route('/admin/reject/<int:id>', methods=['POST'])
+@login_required
+def admin_reject_user(id):
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    
+    user = User.query.get_or_404(id)
+    username = user.username
+    
+    if user.role != 'admin':
+        # Delete related chat messages
+        Chat.query.filter_by(user_id=user.id).delete()
+        # Delete related orders and order items
+        OrderItem.query.filter(OrderItem.order_id.in_(
+            db.session.query(Order.id).filter(Order.buyer_id == user.id)
+        )).delete(synchronize_session=False)
+        Order.query.filter_by(buyer_id=user.id).delete()
+        # Delete products if seller
+        Product.query.filter_by(seller_id=user.id).delete()
+        # Delete user
+        db.session.delete(user)
+        db.session.commit()
+        flash(f'Akun {username} telah dihapus', 'success')
+    return redirect(url_for('dashboard_admin'))
+
+@app.route('/admin/sellers')
+@login_required
+def admin_sellers():
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    
+    sellers = User.query.filter_by(role='peternak').all()
+    return render_template('admin_sellers.html', sellers=sellers)
+
+@app.route('/admin/seller/edit/<int:id>', methods=['GET', 'POST'])
+@login_required
+def admin_seller_edit(id):
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    
+    user = User.query.get_or_404(id)
+    if user.role != 'peternak':
+        flash('User bukan seller', 'danger')
+        return redirect(url_for('admin_sellers'))
+    
+    if request.method == 'POST':
+        user.nama_toko = request.form.get('nama_toko', '').strip()
+        user.deskripsi_toko = request.form.get('deskripsi_toko', '').strip()
+        user.no_hp = request.form.get('no_hp', '').strip()
+        user.alamat = request.form.get('alamat', '').strip()
+        user.verifikasi = 'verifikasi' in request.form
+        db.session.commit()
+        flash(f'Toko {user.username} berhasil diupdate', 'success')
+        return redirect(url_for('admin_sellers'))
+    
+    return render_template('admin_seller_edit.html', seller=user)
+
+@app.route('/admin/seller/delete/<int:id>', methods=['POST'])
+@login_required
+def admin_seller_delete(id):
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    
+    user = User.query.get_or_404(id)
+    if user.role != 'peternak':
+        flash('User bukan seller', 'danger')
+        return redirect(url_for('admin_sellers'))
+    
+    # Delete all products of this seller first
+    Product.query.filter_by(seller_id=user.id).delete()
+    db.session.delete(user)
+    db.session.commit()
+    flash(f'Seller {user.username} dan produknya telah dihapus', 'success')
+    return redirect(url_for('admin_sellers'))
+
+@app.route('/admin/categories')
+@login_required
+def admin_categories():
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    
+    categories = Category.query.all()
+    return render_template('admin_categories.html', categories=categories)
+
+@app.route('/admin/category/add', methods=['POST'])
+@login_required
+def admin_category_add():
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    
+    name = request.form.get('name', '').strip()
+    description = request.form.get('description', '').strip()
+    
+    if not name:
+        flash('Nama kategori wajib diisi', 'danger')
+        return redirect(url_for('admin_categories'))
+    
+    # Create slug
+    import re
+    slug = re.sub(r'[^a-z0-9]', '-', name.lower()).strip('-')
+    
+    # Check duplicate
+    existing = Category.query.filter_by(name=name).first()
+    if existing:
+        flash('Kategori sudah ada', 'warning')
+        return redirect(url_for('admin_categories'))
+    
+    category = Category(name=name, slug=slug, description=description)
+    db.session.add(category)
+    db.session.commit()
+    flash(f'Kategori {name} ditambahkan', 'success')
+    return redirect(url_for('admin_categories'))
+
+@app.route('/admin/category/edit/<int:id>', methods=['POST'])
+@login_required
+def admin_category_edit(id):
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    
+    category = Category.query.get_or_404(id)
+    name = request.form.get('name', '').strip()
+    description = request.form.get('description', '').strip()
+    
+    if not name:
+        flash('Nama kategori wajib diisi', 'danger')
+        return redirect(url_for('admin_categories'))
+    
+    # Check duplicate (exclude current)
+    existing = Category.query.filter(Category.name == name, Category.id != id).first()
+    if existing:
+        flash('Nama kategori sudah digunakan', 'warning')
+        return redirect(url_for('admin_categories'))
+    
+    import re
+    category.name = name
+    category.slug = re.sub(r'[^a-z0-9]', '-', name.lower()).strip('-')
+    category.description = description
+    db.session.commit()
+    flash(f'Kategori {name} diupdate', 'success')
+    return redirect(url_for('admin_categories'))
+
+@app.route('/admin/category/delete/<int:id>', methods=['POST'])
+@login_required
+def admin_category_delete(id):
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    
+    category = Category.query.get_or_404(id)
+    name = category.name
+    
+    # Check if category is used by products
+    products_count = Product.query.filter_by(jenis=name).count()
+    if products_count > 0:
+        flash(f'Kategori {name} masih digunakan oleh {products_count} produk. Hapus produk terlebih dahulu.', 'danger')
+        return redirect(url_for('admin_categories'))
+    
+    db.session.delete(category)
+    db.session.commit()
+    flash(f'Kategori {name} dihapus', 'success')
+    return redirect(url_for('admin_categories'))
+
+# ==================== SHIPPING MANAGEMENT ====================
+
+@app.route('/admin/shipping')
+@login_required
+def admin_shipping():
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    
+    couriers = ShippingCourier.query.all()
+    zones = ShippingZone.query.all()
+    promos = FreeShippingPromo.query.all()
+    api_key = Setting.get('rajaongkir_api_key', '')
+    app_api_key = Setting.get('app_api_key', '')
+    
+    return render_template('admin_shipping.html', couriers=couriers, zones=zones, promos=promos, api_key=api_key, app_api_key=app_api_key)
+
+# Courier Management
+@app.route('/admin/shipping/courier/add', methods=['POST'])
+@login_required
+def admin_courier_add():
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    
+    name = request.form.get('name', '').strip()
+    description = request.form.get('description', '').strip()
+    
+    if not name:
+        flash('Nama kurir wajib diisi', 'danger')
+        return redirect(url_for('admin_shipping'))
+    
+    slug = re.sub(r'[^a-z0-9]', '-', name.lower()).strip('-')
+    
+    courier = ShippingCourier(name=name, slug=slug, description=description)
+    db.session.add(courier)
+    db.session.commit()
+    flash(f'Kurir {name} ditambahkan', 'success')
+    return redirect(url_for('admin_shipping'))
+
+@app.route('/admin/shipping/courier/toggle/<int:id>', methods=['POST'])
+@login_required
+def admin_courier_toggle(id):
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    
+    courier = ShippingCourier.query.get_or_404(id)
+    courier.is_active = not courier.is_active
+    db.session.commit()
+    status = 'diaktifkan' if courier.is_active else 'dinonaktifkan'
+    flash(f'Kurir {courier.name} {status}', 'success')
+    return redirect(url_for('admin_shipping'))
+
+@app.route('/admin/shipping/courier/delete/<int:id>', methods=['POST'])
+@login_required
+def admin_courier_delete(id):
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    
+    courier = ShippingCourier.query.get_or_404(id)
+    name = courier.name
+    db.session.delete(courier)
+    db.session.commit()
+    flash(f'Kurir {name} dihapus', 'success')
+    return redirect(url_for('admin_shipping'))
+
+# Zone Management
+@app.route('/admin/shipping/zone/add', methods=['POST'])
+@login_required
+def admin_zone_add():
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    
+    name = request.form.get('name', '').strip()
+    zone_code = request.form.get('zone_code', '').strip().upper()
+    base_cost = int(request.form.get('base_cost', 0) or 0)
+    cost_per_kg = int(request.form.get('cost_per_kg', 0) or 0)
+    estimated_days = request.form.get('estimated_days', '').strip()
+    
+    if not name or not zone_code:
+        flash('Nama dan kode zona wajib diisi', 'danger')
+        return redirect(url_for('admin_shipping'))
+    
+    existing = ShippingZone.query.filter_by(zone_code=zone_code).first()
+    if existing:
+        flash('Kode zona sudah ada', 'warning')
+        return redirect(url_for('admin_shipping'))
+    
+    zone = ShippingZone(name=name, zone_code=zone_code, base_cost=base_cost, 
+                        cost_per_kg=cost_per_kg, estimated_days=estimated_days)
+    db.session.add(zone)
+    db.session.commit()
+    flash(f'Zona {name} ditambahkan', 'success')
+    return redirect(url_for('admin_shipping'))
+
+@app.route('/admin/shipping/zone/edit/<int:id>', methods=['POST'])
+@login_required
+def admin_zone_edit(id):
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    
+    zone = ShippingZone.query.get_or_404(id)
+    zone.name = request.form.get('name', '').strip()
+    zone.base_cost = int(request.form.get('base_cost', 0) or 0)
+    zone.cost_per_kg = int(request.form.get('cost_per_kg', 0) or 0)
+    zone.estimated_days = request.form.get('estimated_days', '').strip()
+    db.session.commit()
+    flash(f'Zona {zone.name} diupdate', 'success')
+    return redirect(url_for('admin_shipping'))
+
+@app.route('/admin/shipping/zone/toggle/<int:id>', methods=['POST'])
+@login_required
+def admin_zone_toggle(id):
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    
+    zone = ShippingZone.query.get_or_404(id)
+    zone.is_active = not zone.is_active
+    db.session.commit()
+    status = 'diaktifkan' if zone.is_active else 'dinonaktifkan'
+    flash(f'Zona {zone.name} {status}', 'success')
+    return redirect(url_for('admin_shipping'))
+
+@app.route('/admin/shipping/zone/delete/<int:id>', methods=['POST'])
+@login_required
+def admin_zone_delete(id):
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    
+    zone = ShippingZone.query.get_or_404(id)
+    name = zone.name
+    db.session.delete(zone)
+    db.session.commit()
+    flash(f'Zona {name} dihapus', 'success')
+    return redirect(url_for('admin_shipping'))
+
+# Free Shipping Promo
+@app.route('/admin/shipping/promo/add', methods=['POST'])
+@login_required
+def admin_promo_add():
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    
+    name = request.form.get('name', '').strip()
+    minpurchase = int(request.form.get('minpurchase', 0) or 0)
+    max_discount = int(request.form.get('max_discount', 0) or 0)
+    
+    if not name:
+        flash('Nama promo wajib diisi', 'danger')
+        return redirect(url_for('admin_shipping'))
+    
+    promo = FreeShippingPromo(name=name, minpurchase=minpurchase, max_discount=max_discount)
+    db.session.add(promo)
+    db.session.commit()
+    flash(f'Promo {name} ditambahkan', 'success')
+    return redirect(url_for('admin_shipping'))
+
+@app.route('/admin/shipping/promo/toggle/<int:id>', methods=['POST'])
+@login_required
+def admin_promo_toggle(id):
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    
+    promo = FreeShippingPromo.query.get_or_404(id)
+    promo.is_active = not promo.is_active
+    db.session.commit()
+    status = 'diaktifkan' if promo.is_active else 'dinonaktifkan'
+    flash(f'Promo {promo.name} {status}', 'success')
+    return redirect(url_for('admin_shipping'))
+
+@app.route('/admin/shipping/promo/delete/<int:id>', methods=['POST'])
+@login_required
+def admin_promo_delete(id):
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    
+    promo = FreeShippingPromo.query.get_or_404(id)
+    name = promo.name
+    db.session.delete(promo)
+    db.session.commit()
+    flash(f'Promo {name} dihapus', 'success')
+    return redirect(url_for('admin_shipping'))
+
+@app.route('/admin/shipping/api-key', methods=['POST'])
+@login_required
+def admin_update_api_key():
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    
+    api_key = request.form.get('api_key', '').strip()
+    
+    # Save to database
+    Setting.set('rajaongkir_api_key', api_key)
+    
+    flash('API Key RajaOngkir berhasil diupdate', 'success')
+    return redirect(url_for('admin_shipping'))
+
+@app.route('/admin/shipping/generate-app-key', methods=['POST'])
+@login_required
+def admin_generate_app_key():
+    """Generate API key for mobile app"""
+    if current_user.role != 'admin':
+        flash('Unauthorized', 'error')
+        return redirect(url_for('index'))
+    
+    timestamp = str(int(time.time()))
+    api_key = hashlib.sha256(f'entokmart_app_{timestamp}'.encode()).hexdigest()[:32]
+    
+    Setting.set('app_api_key', api_key)
+    
+    flash(f'App API Key generated: {api_key}', 'success')
+    return redirect(url_for('admin_shipping'))
+
+
+@app.route('/admin/payment')
+@login_required
+def admin_payment():
+    """Payment gateway settings page"""
+    if current_user.role != 'admin':
+        flash('Unauthorized', 'error')
+        return redirect(url_for('index'))
+    
+    # Get current settings
+    midtrans_server_key = Setting.get('midtrans_server_key', '')
+    midtrans_client_key = Setting.get('midtrans_client_key', '')
+    midtrans_production = Setting.get('midtrans_production', 'false')
+    
+    # Mask server key for display
+    display_server_key = midtrans_server_key[:8] + '****' if midtrans_server_key else ''
+    
+    return render_template('admin_payment.html',
+                           title='Kelola Payment Gateway',
+                           midtrans_enabled=is_midtrans_enabled(),
+                           midtrans_server_key=display_server_key,
+                           midtrans_client_key=midtrans_client_key,
+                           midtrans_production=midtrans_production == 'true')
+
+
+@app.route('/admin/payment/midtrans', methods=['POST'])
+@login_required
+def admin_save_midtrans():
+    """Save Midtrans configuration"""
+    if current_user.role != 'admin':
+        return {'success': False, 'message': 'Unauthorized'}, 403
+    
+    server_key = request.form.get('server_key', '').strip()
+    client_key = request.form.get('client_key', '').strip()
+    production = request.form.get('production', 'false')
+    
+    if server_key:
+        Setting.set('midtrans_server_key', server_key)
+    if client_key:
+        Setting.set('midtrans_client_key', client_key)
+    Setting.set('midtrans_production', production)
+    
+    app.config['MIDTRANS_SERVER_KEY'] = server_key
+    app.config['MIDTRANS_CLIENT_KEY'] = client_key
+    app.config['MIDTRANS_IS_PRODUCTION'] = production == 'true'
+    
+    flash('Midtrans configuration saved', 'success')
+    return redirect(url_for('admin_payment'))
+
 @app.route('/admin/user/edit/<int:id>', methods=['GET', 'POST'])
 @login_required
 def admin_user_edit(id):
@@ -1146,6 +1740,15 @@ def admin_user_delete(id):
         return redirect(url_for('dashboard_admin'))
     
     user = User.query.get_or_404(id)
+    
+    # Delete related data first
+    Chat.query.filter_by(user_id=user.id).delete()
+    OrderItem.query.filter(OrderItem.order_id.in_(
+        db.session.query(Order.id).filter(Order.buyer_id == user.id)
+    )).delete(synchronize_session=False)
+    Order.query.filter_by(buyer_id=user.id).delete()
+    Product.query.filter_by(seller_id=user.id).delete()
+    
     db.session.delete(user)
     db.session.commit()
     flash(f'User {user.username} dihapus', 'success')
@@ -1356,3 +1959,434 @@ def format_telegram_pesanan(order):
 
 def format_telegram_chat(username, pesan):
     return f"<b>💬 Chat dari {username}:</b>\n{pesan}\n\n<a href=\"http://127.0.0.1:5003/chat\">Balas di EntokMart</a>"
+
+# ======================
+# PUBLIC API FOR APPLICATIONS
+# ======================
+import hashlib
+import time
+
+def validate_api_key(api_key):
+    """Validate API key from request header"""
+    if not api_key:
+        return False, 'API Key required'
+    
+    # Check if it's the stored API key
+    stored_key = Setting.get('app_api_key')
+    if stored_key and api_key == stored_key:
+        return True, 'Valid'
+    
+    # Also allow the default key in config
+    default_key = app.config.get('API_KEY', '')
+    if default_key and api_key == default_key:
+        return True, 'Valid'
+    
+    return False, 'Invalid API Key'
+
+def require_api_key(f):
+    """Decorator to require API key"""
+    from functools import wraps
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        api_key = request.headers.get('X-API-Key', '')
+        valid, msg = validate_api_key(api_key)
+        if not valid:
+            return {'success': False, 'message': msg}, 401
+        return f(*args, **kwargs)
+    return decorated_function
+
+@app.route('/api/v1/products')
+def api_products():
+    """Get all products (public)"""
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 20))
+    category = request.args.get('category', '')
+    search = request.args.get('search', '')
+    
+    query = Product.query.filter(Product.stok > 0)
+    
+    if category:
+        query = query.filter(Product.jenis == category)
+    if search:
+        query = query.filter(Product.name.contains(search))
+    
+    products = query.order_by(Product.created_at.desc()).paginate(page=page, per_page=per_page)
+    
+    result = {
+        'success': True,
+        'data': [{
+            'id': p.id,
+            'name': p.name,
+            'jenis': p.jenis,
+            'harga': p.harga,
+            'berat_kg': p.berat_kg,
+            'stok': p.stok,
+            'deskripsi': p.deskripsi,
+            'image_url': p.image_url,
+            'seller': {
+                'id': p.seller.id,
+                'username': p.seller.username,
+                'nama_toko': p.seller.nama_toko
+            },
+            'created_at': p.created_at.isoformat() if p.created_at else None
+        } for p in products.items],
+        'pagination': {
+            'page': products.page,
+            'per_page': products.per_page,
+            'total': products.total,
+            'pages': products.pages
+        }
+    }
+    return result
+
+@app.route('/api/v1/products/<int:product_id>')
+def api_product_detail(product_id):
+    """Get product detail (public)"""
+    product = Product.query.get_or_404(product_id)
+    
+    return {
+        'success': True,
+        'data': {
+            'id': product.id,
+            'name': product.name,
+            'jenis': product.jenis,
+            'harga': product.harga,
+            'berat_kg': product.berat_kg,
+            'stok': product.stok,
+            'deskripsi': product.deskripsi,
+            'image_url': product.image_url,
+            'seller': {
+                'id': product.seller.id,
+                'username': product.seller.username,
+                'nama_toko': product.seller.nama_toko,
+                'no_hp': product.seller.no_hp,
+                'alamat': product.seller.alamat
+            },
+            'created_at': product.created_at.isoformat() if product.created_at else None
+        }
+    }
+
+@app.route('/api/v1/categories')
+def api_categories():
+    """Get all categories (public)"""
+    categories = Category.query.all()
+    return {
+        'success': True,
+        'data': [{
+            'id': c.id,
+            'name': c.name,
+            'slug': c.slug,
+            'description': c.description
+        } for c in categories]
+    }
+
+@app.route('/api/v1/sellers')
+def api_sellers():
+    """Get all sellers (public)"""
+    sellers = User.query.filter(
+        User.role == 'peternak',
+        User.nama_toko != None
+    ).all()
+    
+    return {
+        'success': True,
+        'data': [{
+            'id': s.id,
+            'username': s.username,
+            'nama_toko': s.nama_toko,
+            'deskripsi_toko': s.deskripsi_toko,
+            'no_hp': s.no_hp,
+            'alamat': s.alamat,
+            'verifikasi': s.verifikasi
+        } for s in sellers]
+    }
+
+@app.route('/api/v1/sellers/<username>')
+def api_seller_detail(username):
+    """Get seller detail and products (public)"""
+    seller = User.query.filter_by(username=username).first_or_404()
+    
+    if not seller.nama_toko:
+        return {'success': False, 'message': 'Toko tidak ditemukan'}, 404
+    
+    products = Product.query.filter_by(seller_id=seller.id, stok__gt=0).all()
+    
+    return {
+        'success': True,
+        'data': {
+            'seller': {
+                'id': seller.id,
+                'username': seller.username,
+                'nama_toko': seller.nama_toko,
+                'deskripsi_toko': seller.deskripsi_toko,
+                'no_hp': seller.no_hp,
+                'alamat': seller.alamat,
+                'verifikasi': seller.verifikasi
+            },
+            'products': [{
+                'id': p.id,
+                'name': p.name,
+                'jenis': p.jenis,
+                'harga': p.harga,
+                'berat_kg': p.berat_kg,
+                'stok': p.stok,
+                'image_url': p.image_url
+            } for p in products]
+        }
+    }
+
+@app.route('/api/v1/orders/<int:order_id>')
+def api_order_tracking(order_id):
+    """Track order by ID (public with order code)"""
+    order_code = request.args.get('code', '')
+    
+    order = Order.query.get_or_404(order_id)
+    
+    # Validate code or buyer
+    if order_code or (current_user.is_authenticated and current_user.id == order.buyer_id):
+        return {
+            'success': True,
+            'data': {
+                'id': order.id,
+                'status': order.status,
+                'payment_status': order.payment_status,
+                'payment_method': order.payment_method,
+                'total_harga': order.total_harga,
+                'ongkir': order.ongkir,
+                'resi': order.resi,
+                'nama_penerima': order.nama_penerima,
+                'alamat': order.alamat,
+                'telp': order.telp,
+                'created_at': order.created_at.isoformat() if order.created_at else None,
+                'items': [{
+                    'name': item.nama_product,
+                    'jumlah': item.jumlah,
+                    'harga': item.harga_saat_beli
+                } for item in order.items]
+            }
+        }
+    
+    return {'success': False, 'message': 'Unauthorized'}, 401
+
+@app.route('/api/v1/zones')
+def api_shipping_zones():
+    """Get shipping zones (public)"""
+    zones = ShippingZone.query.filter_by(is_active=True).all()
+    
+    return {
+        'success': True,
+        'data': [{
+            'id': z.id,
+            'name': z.name,
+            'zone_code': z.zone_code,
+            'base_cost': z.base_cost,
+            'cost_per_kg': z.cost_per_kg,
+            'estimated_days': z.estimated_days
+        } for z in zones]
+    }
+
+@app.route('/api/v1/calculate-shipping', methods=['POST'])
+@csrf.exempt
+def api_calculate_shipping():
+    """Calculate shipping cost"""
+    data = request.get_json()
+    if not data:
+        return {'success': False, 'message': 'Invalid JSON'}, 400
+    weight = float(data.get('weight', 0))
+    zone_code = data.get('zone_code', '')
+    
+    if weight <= 0:
+        return {'success': False, 'message': 'Weight required'}
+    
+    cost = calculate_shipping_cost(weight, zone_code)
+    
+    return {
+        'success': True,
+        'data': {
+            'weight_kg': weight,
+            'zone_code': zone_code,
+            'cost': cost
+        }
+    }
+
+@app.route('/api/v1/generate-key', methods=['POST'])
+@login_required
+def api_generate_key():
+    """Generate new API key (admin only)"""
+    if current_user.role != 'admin':
+        return {'success': False, 'message': 'Unauthorized'}, 403
+    
+    # Generate random API key
+    timestamp = str(int(time.time()))
+    api_key = hashlib.sha256(f'entokmart_{timestamp}'.encode()).hexdigest()[:32]
+    
+    # Save to settings
+    Setting.set('app_api_key', api_key)
+    
+    return {
+        'success': True,
+        'message': 'API Key generated',
+        'api_key': api_key
+    }
+
+
+@app.route('/api/v1/payment/methods')
+def api_payment_methods():
+    """Get available payment methods"""
+    return {
+        'success': True,
+        'methods': get_payment_methods(),
+        'midtrans_enabled': is_midtrans_enabled()
+    }
+
+
+@app.route('/api/v1/payment/create-snap', methods=['POST'])
+@login_required
+def api_create_snap():
+    """Create Midtrans Snap token for payment"""
+    if not is_midtrans_enabled():
+        return {'success': False, 'message': 'Payment gateway not configured'}, 400
+    
+    data = request.get_json()
+    order_id = data.get('order_id')
+    amount = data.get('amount')
+    
+    if not order_id or not amount:
+        return {'success': False, 'message': 'Missing order_id or amount'}, 400
+    
+    # Get order details
+    order = Order.query.filter_by(id=order_id, user_id=current_user.id).first()
+    if not order:
+        return {'success': False, 'message': 'Order not found'}, 404
+    
+    if order.total_amount != amount:
+        return {'success': False, 'message': 'Amount mismatch'}, 400
+    
+    # Build customer details
+    customer_details = {
+        'first_name': current_user.username,
+        'email': current_user.email,
+        'phone': current_user.phone or '',
+    }
+    
+    # Build item details
+    item_details = []
+    for item in order.items:
+        item_details.append({
+            'id': str(item.id),
+            'name': item.product.name,
+            'price': int(item.price),
+            'quantity': item.quantity,
+        })
+    
+    # Add shipping as item
+    if order.shipping_cost > 0:
+        item_details.append({
+            'id': 'shipping',
+            'name': 'Biaya Pengiriman',
+            'price': int(order.shipping_cost),
+            'quantity': 1,
+        })
+    
+    # Create Snap token
+    result = create_snap_token(order_id, amount, customer_details, item_details)
+    
+    if result.get('success'):
+        # Update order payment method
+        order.payment_method = 'midtrans'
+        order.payment_token = result.get('token')
+        db.session.commit()
+        
+        return {
+            'success': True,
+            'token': result.get('token'),
+            'redirect_url': result.get('redirect_url'),
+        }
+    else:
+        return {'success': False, 'message': result.get('message')}, 500
+
+
+@app.route('/api/v1/payment/status/<int:order_id>')
+@login_required
+def api_payment_status(order_id):
+    """Check payment status for an order"""
+    order = Order.query.filter_by(id=order_id, user_id=current_user.id).first()
+    if not order:
+        return {'success': False, 'message': 'Order not found'}, 404
+    
+    if order.payment_method != 'midtrans':
+        return {'success': False, 'message': 'Not a Midtrans payment'}, 400
+    
+    result = check_transaction_status(order_id)
+    
+    if result.get('success'):
+        midtrans_status = result['data'].get('transaction_status', '')
+        payment_status = get_midtrans_status_from_code(midtrans_status)
+        
+        return {
+            'success': True,
+            'order_id': order_id,
+            'payment_status': payment_status,
+            'midtrans_status': midtrans_status,
+            'data': result['data']
+        }
+    else:
+        return {'success': False, 'message': result.get('message')}, 500
+
+
+@app.route('/api/v1/payment/notification', methods=['POST'])
+def api_payment_notification():
+    """Midtrans webhook notification handler"""
+    data = request.get_json()
+    
+    order_id = data.get('order_id')
+    status = data.get('transaction_status')
+    
+    if not order_id:
+        return jsonify({'status': 'ok'}), 200
+    
+    order = Order.query.get(order_id)
+    if not order:
+        return jsonify({'status': 'ok'}), 200
+    
+    # Update order status based on Midtrans notification
+    payment_status = get_midtrans_status_from_code(status)
+    
+    if payment_status == 'confirmed':
+        order.status = 'paid'
+        order.payment_status = 'paid'
+        order.midtrans_status = status
+        
+        # Update order items stock
+        for item in order.items:
+            product = item.product
+            if product.stock >= item.quantity:
+                product.stock -= item.quantity
+        
+        db.session.commit()
+        
+        # Send notification via Telegram
+        try:
+            from services.telegram import send_order_notification
+            send_order_notification(order, 'paid')
+        except:
+            pass
+    
+    elif payment_status == 'failed':
+        order.status = 'payment_failed'
+        order.payment_status = 'failed'
+        order.midtrans_status = status
+        db.session.commit()
+    
+    return jsonify({'status': 'ok'}), 200
+
+
+@app.route('/api/v1/payment/client-key')
+def api_payment_client_key():
+    """Get Midtrans client key for frontend"""
+    config = get_midtrans_config()
+    return {
+        'success': True,
+        'client_key': config.get('client_key', ''),
+        'enabled': is_midtrans_enabled()
+    }

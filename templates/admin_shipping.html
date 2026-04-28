@@ -1,0 +1,460 @@
+{% extends "base.html" %}
+{% block title %}Kelola Ongkir - EntokMart{% endblock %}
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-truck"></i> Pengaturan Ongkir</h2>
+
+<div class="mb-3">
+    <a href="{{ url_for('dashboard_admin') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Kembali ke Dashboard
+    </a>
+</div>
+
+<!-- Nav Tabs -->
+<ul class="nav nav-tabs mb-4" id="shippingTab" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="api-tab" data-bs-toggle="tab" data-bs-target="#api" type="button" role="tab">
+            <i class="bi bi-key"></i> API Key
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="courier-tab" data-bs-toggle="tab" data-bs-target="#courier" type="button" role="tab">
+            <i class="bi bi-box-seam"></i> Kurir
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="zone-tab" data-bs-toggle="tab" data-bs-target="#zone" type="button" role="tab">
+            <i class="bi bi-geo-alt"></i> Zona Pengiriman
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="promo-tab" data-bs-toggle="tab" data-bs-target="#promo" type="button" role="tab">
+            <i class="bi bi-gift"></i> Promo Gratis Ongkir
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="settings-tab" data-bs-toggle="tab" data-bs-target="#settings" type="button" role="tab">
+            <i class="bi bi-gear"></i> Pengaturan
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="shippingTabContent">
+    <!-- API Key Tab -->
+    <div class="tab-pane fade show active" id="api" role="tabpanel">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="bi bi-key"></i> API Key RajaOngkir</h5>
+                    </div>
+                    <div class="card-body">
+                        <form action="{{ url_for('admin_update_api_key') }}" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="mb-3">
+                                <label class="form-label">API Key</label>
+                                <input type="text" name="api_key" class="form-control" 
+                                       value="{{ api_key or '' }}" 
+                                       placeholder="Masukkan API Key RajaOngkir">
+                                <small class="text-muted">Dapatkan API key dari <a href="https://rajaongkir.com" target="_blank">rajaongkir.com</a> atau <a href="https://komerce.id" target="_blank">komerce.id</a></small>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Status</label>
+                                <div>
+                                    {% if api_key %}
+                                    <span class="badge bg-success"><i class="bi bi-check-circle"></i> API Key Terhubung</span>
+                                    {% else %}
+                                    <span class="badge bg-warning"><i class="bi bi-exclamation-triangle"></i> Menggunakan Ongkir Default</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% if app_api_key %}
+                            <div class="mb-3">
+                                <label class="form-label">App API Key (untuk aplikasi mobile)</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" value="{{ app_api_key }}" readonly id="appApiKey">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="copyApiKey()">
+                                        <i class="bi bi-clipboard"></i> Copy
+                                    </button>
+                                </div>
+                                <small class="text-muted">Gunakan key ini untuk mengakses API dari aplikasi mobile</small>
+                            </div>
+                            {% endif %}
+                            <button type="submit" class="btn btn-entok">
+                                <i class="bi bi-save"></i> Simpan API Key
+                            </button>
+                        </form>
+                        <hr>
+                        <form action="{{ url_for('admin_generate_app_key') }}" method="POST" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-warning">
+                                <i class="bi bi-key"></i> Generate App API Key Baru
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="bi bi-info-circle"></i> Info</h5>
+                    </div>
+                    <div class="card-body">
+                        <h6>Jika API Key tidak aktif:</h6>
+                        <ul>
+                            <li>Sistem akan otomatis menggunakan <strong>ongkir default</strong></li>
+                            <li>Ongkir dihitung dari: <code>Biaya Dasar + (Berat × Biaya per Kg)</code></li>
+                            <li>Anda dapat mengubah biaya di tab <strong>Zona Pengiriman</strong></li>
+                        </ul>
+                        <h6 class="mt-3">API Key berfungsi untuk:</h6>
+                        <ul>
+                            <li>Mengambil daftar provinsi & kota</li>
+                            <li>Menghitung ongkir real-time berdasarkan lokasi</li>
+                            <li>Melacak resi pengiriman</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Courier Tab -->
+    <div class="tab-pane fade" id="courier" role="tabpanel">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Tambah Kurir</h5>
+                    </div>
+                    <div class="card-body">
+                        <form action="{{ url_for('admin_courier_add') }}" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="mb-3">
+                                <label class="form-label">Nama Kurir</label>
+                                <input type="text" name="name" class="form-control" placeholder="Contoh: JNE, J&T, SiCepat" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Deskripsi</label>
+                                <input type="text" name="description" class="form-control" placeholder="Deskripsi singkat">
+                            </div>
+                            <button type="submit" class="btn btn-entok w-100">Tambah Kurir</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">Daftar Kurir ({{ couriers|length }})</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if couriers %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Nama Kurir</th>
+                                        <th>Slug</th>
+                                        <th>Deskripsi</th>
+                                        <th>Status</th>
+                                        <th>Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for c in couriers %}
+                                    <tr>
+                                        <td><strong>{{ c.name }}</strong></td>
+                                        <td><code>{{ c.slug }}</code></td>
+                                        <td>{{ c.description or '-' }}</td>
+                                        <td>
+                                            {% if c.is_active %}
+                                            <span class="badge bg-success">Aktif</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">Nonaktif</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <form action="{{ url_for('admin_courier_toggle', id=c.id) }}" method="POST" class="d-inline">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <button type="submit" class="btn btn-sm btn-{% if c.is_active %}warning{% else %}success{% endif %}">
+                                                    <i class="bi bi-{% if c.is_active %}pause-circle{% else %}play-circle{% endif %}"></i>
+                                                </button>
+                                            </form>
+                                            <form action="{{ url_for('admin_courier_delete', id=c.id) }}" method="POST" class="d-inline">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Hapus kurir {{ c.name }}?')">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-info">Belum ada kurir. Silakan tambah kurir terlebih dahulu.</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Zone Tab -->
+    <div class="tab-pane fade" id="zone" role="tabpanel">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Tambah Zona</h5>
+                    </div>
+                    <div class="card-body">
+                        <form action="{{ url_for('admin_zone_add') }}" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="mb-3">
+                                <label class="form-label">Nama Zona</label>
+                                <input type="text" name="name" class="form-control" placeholder="Contoh: Jabodetabek, Jawa, Sumatera" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Kode Zona</label>
+                                <input type="text" name="zone_code" class="form-control" placeholder="Contoh: JABODETABEK, JAWASUM" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Biaya Dasar (Rp)</label>
+                                <input type="number" name="base_cost" class="form-control" value="5000" min="0">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Biaya per Kg (Rp)</label>
+                                <input type="number" name="cost_per_kg" class="form-control" value="3000" min="0">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Estimasi Hari</label>
+                                <input type="text" name="estimated_days" class="form-control" placeholder="Contoh: 1-2 hari">
+                            </div>
+                            <button type="submit" class="btn btn-entok w-100">Tambah Zona</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">Daftar Zona ({{ zones|length }})</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if zones %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Nama Zona</th>
+                                        <th>Kode</th>
+                                        <th>Biaya Dasar</th>
+                                        <th>/Kg</th>
+                                        <th>Estimasi</th>
+                                        <th>Status</th>
+                                        <th>Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for z in zones %}
+                                    <tr>
+                                        <td><strong>{{ z.name }}</strong></td>
+                                        <td><code>{{ z.zone_code }}</code></td>
+                                        <td>Rp {{ "{:,}".format(z.base_cost) }}</td>
+                                        <td>Rp {{ "{:,}".format(z.cost_per_kg) }}</td>
+                                        <td>{{ z.estimated_days or '-' }}</td>
+                                        <td>
+                                            {% if z.is_active %}
+                                            <span class="badge bg-success">Aktif</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">Nonaktif</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#zoneModal{{ z.id }}">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <form action="{{ url_for('admin_zone_toggle', id=z.id) }}" method="POST" class="d-inline">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <button type="submit" class="btn btn-sm btn-{% if z.is_active %}warning{% else %}success{% endif %}">
+                                                    <i class="bi bi-{% if z.is_active %}pause-circle{% else %}play-circle{% endif %}"></i>
+                                                </button>
+                                            </form>
+                                            <form action="{{ url_for('admin_zone_delete', id=z.id) }}" method="POST" class="d-inline">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Hapus zona {{ z.name }}?')">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    <!-- Edit Modal -->
+                                    <div class="modal fade" id="zoneModal{{ z.id }}" tabindex="-1">
+                                        <div class="modal-dialog">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">Edit Zona {{ z.name }}</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <form action="{{ url_for('admin_zone_edit', id=z.id) }}" method="POST">
+                                                    <div class="modal-body">
+                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Nama Zona</label>
+                                                            <input type="text" name="name" class="form-control" value="{{ z.name }}" required>
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Biaya Dasar (Rp)</label>
+                                                            <input type="number" name="base_cost" class="form-control" value="{{ z.base_cost }}" min="0">
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Biaya per Kg (Rp)</label>
+                                                            <input type="number" name="cost_per_kg" class="form-control" value="{{ z.cost_per_kg }}" min="0">
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Estimasi Hari</label>
+                                                            <input type="text" name="estimated_days" class="form-control" value="{{ z.estimated_days or '' }}">
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                                                        <button type="submit" class="btn btn-entok">Simpan</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-info">Belum ada zona. Silakan tambah zona terlebih dahulu.</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Promo Tab -->
+    <div class="tab-pane fade" id="promo" role="tabpanel">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Tambah Promo</h5>
+                    </div>
+                    <div class="card-body">
+                        <form action="{{ url_for('admin_promo_add') }}" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="mb-3">
+                                <label class="form-label">Nama Promo</label>
+                                <input type="text" name="name" class="form-control" placeholder="Contoh: Gratis Ongkir Jakarta" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Min. Belanja (Rp)</label>
+                                <input type="number" name="minpurchase" class="form-control" value="0" min="0" placeholder="0 = tanpa minimum">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Max Potongan (Rp)</label>
+                                <input type="number" name="max_discount" class="form-control" value="0" min="0" placeholder="0 = tidak terbatas">
+                            </div>
+                            <button type="submit" class="btn btn-entok w-100">Tambah Promo</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">Daftar Promo ({{ promos|length }})</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if promos %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Nama Promo</th>
+                                        <th>Min. Belanja</th>
+                                        <th>Max Potongan</th>
+                                        <th>Status</th>
+                                        <th>Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for p in promos %}
+                                    <tr>
+                                        <td><strong>{{ p.name }}</strong></td>
+                                        <td>{% if p.minpurchase > 0 %}Rp {{ "{:,}".format(p.minpurchase) }}{% else %}Tidak ada{% endif %}</td>
+                                        <td>{% if p.max_discount > 0 %}Rp {{ "{:,}".format(p.max_discount) }}{% else %}Tanpa batas{% endif %}</td>
+                                        <td>
+                                            {% if p.is_active %}
+                                            <span class="badge bg-success">Aktif</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">Nonaktif</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <form action="{{ url_for('admin_promo_toggle', id=p.id) }}" method="POST" class="d-inline">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <button type="submit" class="btn btn-sm btn-{% if p.is_active %}warning{% else %}success{% endif %}">
+                                                    <i class="bi bi-{% if p.is_active %}pause-circle{% else %}play-circle{% endif %}"></i>
+                                                </button>
+                                            </form>
+                                            <form action="{{ url_for('admin_promo_delete', id=p.id) }}" method="POST" class="d-inline">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Hapus promo {{ p.name }}?')">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-info">Belum ada promo. Silakan tambah promo terlebih dahulu.</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Tab -->
+    <div class="tab-pane fade" id="settings" role="tabpanel">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="bi bi-calculator"></i> Rumus Perhitungan Ongkir</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <h6>Formula:</h6>
+                            <code>Ongkir = Biaya Dasar + (Berat x Biaya per Kg)</code>
+                            <hr>
+                            <p class="mb-0 small">Saat ini sistem menggunakan berat produk dalam kilogram untuk menghitung ongkir otomatis saat checkout.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="bi bi-box-seam"></i> Berat Produk</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>Seller dapat mengatur berat produk (dalam kg) saat menambah/mengedit produk.</p>
+                        <p class="text-muted small">Berat produk digunakan untuk menghitung ongkir otomatis.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

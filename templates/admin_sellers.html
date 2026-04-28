@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Kelola Seller - EntokMart{% endblock %}
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-shop"></i> Kelola Toko Seller</h2>
+
+<div class="mb-3">
+    <a href="{{ url_for('dashboard_admin') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Kembali ke Dashboard
+    </a>
+</div>
+
+{% if sellers %}
+<div class="table-responsive">
+    <table class="table table-hover">
+        <thead>
+            <tr>
+                <th>Username</th>
+                <th>Nama Toko</th>
+                <th>Email</th>
+                <th>No. HP</th>
+                <th>Alamat</th>
+                <th>Status</th>
+                <th>Verifikasi</th>
+                <th>Aksi</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in sellers %}
+            <tr>
+                <td>{{ s.username }}</td>
+                <td>
+                    {% if s.nama_toko %}
+                    <a href="{{ url_for('toko', username=s.username) }}" target="_blank">{{ s.nama_toko }}</a>
+                    {% else %}
+                    <span class="text-muted">-</span>
+                    {% endif %}
+                </td>
+                <td>{{ s.email }}</td>
+                <td>{{ s.no_hp or '-' }}</td>
+                <td>{{ s.alamat[:30] if s.alamat else '-' }}{% if s.alamat and s.alamat|length > 30 %}...{% endif %}</td>
+                <td>
+                    {% if s.is_approved %}
+                    <span class="badge bg-success">Aktif</span>
+                    {% else %}
+                    <span class="badge bg-warning">Pending</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if s.verifikasi %}
+                    <span class="badge bg-success"><i class="bi bi-check-circle"></i> Verified</span>
+                    {% else %}
+                    <span class="badge bg-secondary">Belum</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="btn-group" role="group">
+                        <a href="{{ url_for('admin_seller_edit', id=s.id) }}" class="btn btn-sm btn-primary" title="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <a href="{{ url_for('toko', username=s.username) }}" class="btn btn-sm btn-info" title="Lihat Toko" target="_blank">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                        <form action="{{ url_for('admin_seller_delete', id=s.id) }}" method="POST" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-danger" title="Hapus" onclick="return confirm('Yakin hapus seller {{ s.username }} dan semua produknya?')">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> Belum ada seller yang terdaftar.
+</div>
+{% endif %}
+{% endblock %}

@@ -23,6 +23,22 @@
                         <label class="form-label">No. Telepon</label>
                         <input type="text" name="telp" class="form-control" required>
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label">Zona Pengiriman</label>
+                        <select name="shipping_zone" class="form-select" required onchange="updateShippingInfo()">
+                            <option value="">Pilih Zona...</option>
+                            {% if zones %}
+                            {% for z in zones %}
+                            <option value="{{ z.zone_code }}">{{ z.name }} ({{ z.estimated_days or 'Hubungi kami' }})</option>
+                            {% endfor %}
+                            {% else %}
+                            <option value="DEFAULT">DEFAULT - Jabodetabek & Sekitar</option>
+                            {% endif %}
+                        </select>
+                        <small class="text-muted">Pilih zona sesuai lokasi Anda untuk melihat ongkir</small>
+                    </div>
+                        <small class="text-muted">Ongkir akan dihitung berdasarkan berat produk dan tujuan</small>
+                    </div>
                 </form>
             </div>
         </div>
@@ -33,19 +49,28 @@
             </div>
             <div class="card-body">
                 <div class="form-check mb-3">
-                    <input class="form-check-input" type="radio" name="payment_method" id="payment_cod" value="cod" checked>
+                    <input class="form-check-input" type="radio" name="payment_method" id="payment_cod" value="cod" checked onchange="togglePaymentInfo()">
                     <label class="form-check-label" for="payment_cod">
-                        <strong>Cash on Delivery (COD)</strong>
+                        <strong>💵 Cash on Delivery (COD)</strong>
                         <p class="text-muted small mb-0">Bayar saat barang diterima</p>
                     </label>
                 </div>
-                <div class="form-check">
-                    <input class="form-check-input" type="radio" name="payment_method" id="payment_manual" value="manual">
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="radio" name="payment_method" id="payment_manual" value="manual" onchange="togglePaymentInfo()">
                     <label class="form-check-label" for="payment_manual">
-                        <strong>Transfer Bank Manual</strong>
+                        <strong>🏦 Transfer Bank Manual</strong>
                         <p class="text-muted small mb-0">Transfer ke rekening kami, lalu upload bukti</p>
                     </label>
                 </div>
+                {% if midtrans_enabled %}
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="radio" name="payment_method" id="payment_midtrans" value="midtrans" onchange="togglePaymentInfo()">
+                    <label class="form-check-label" for="payment_midtrans">
+                        <strong>💳 Midtrans (Kartu Kredit/VA/e-Wallet)</strong>
+                        <p class="text-muted small mb-0">Bayar instan dengan berbagai metode pembayaran</p>
+                    </label>
+                </div>
+                {% endif %}
                 
                 <div id="bankInfo" class="alert alert-info mt-3" style="display: none;">
                     <h6 class="fw-bold">Bank Transfer</h6>
@@ -55,6 +80,13 @@
                     <hr>
                     <p class="small text-muted mb-0">Setelah transfer, upload bukti di halaman pesanan</p>
                 </div>
+                
+                {% if midtrans_enabled %}
+                <div id="midtransInfo" class="alert alert-success mt-3" style="display: none;">
+                    <h6 class="fw-bold">💳 Pembayaran Midtrans</h6>
+                    <p class="small mb-0">Anda akan diarahkan ke halaman pembayaran Midtrans untuk menyelesaikan transaksi dengan aman.</p>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -79,15 +111,65 @@
                  </div>
                  <hr>
                  <h3 class="text-accent">Total: Rp {{ "{:,}".format(total) }}</h3>
-                <button type="submit" class="btn btn-entok w-100 py-2">
-                    <i class="bi bi-cart-check"></i> Pesan Sekarang
-                </button>
+<button type="submit" form="checkoutForm" class="btn btn-entok w-100 py-2">
+                     <i class="bi bi-cart-check"></i> Pesan Sekarang
+                 </button>
             </div>
         </div>
     </div>
 </div>
 
 <script>
+// Load provinces on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadProvinces();
+});
+
+async function loadProvinces() {
+    try {
+        const response = await fetch('/api/rajaongkir/provinces');
+        const data = await response.json();
+        
+        if (data.success && data.data) {
+            const select = document.getElementById('province');
+            data.data.forEach(province => {
+                const option = document.createElement('option');
+                option.value = province.id;
+                option.textContent = province.name;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading provinces:', error);
+    }
+}
+
+async function loadCities() {
+    const provinceId = document.getElementById('province').value;
+    const citySelect = document.getElementById('destination_city');
+    
+    // Clear existing options
+    citySelect.innerHTML = '<option value="">Pilih Kota...</option>';
+    
+    if (!provinceId) return;
+    
+    try {
+        const response = await fetch(`/api/rajaongkir/cities?province_id=${provinceId}`);
+        const data = await response.json();
+        
+        if (data.success && data.data) {
+            data.data.forEach(city => {
+                const option = document.createElement('option');
+                option.value = city.id;
+                option.textContent = `${city.type} ${city.name}`;
+                citySelect.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading cities:', error);
+    }
+}
+
 document.querySelectorAll('input[name="payment_method"]').forEach(radio => {
     radio.addEventListener('change', function() {
         const bankInfo = document.getElementById('bankInfo');

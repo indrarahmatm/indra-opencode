@@ -41,8 +41,16 @@
                     </tbody>
                     <tfoot class="table-light">
                         <tr>
-                            <td colspan="4" class="text-end"><strong>Total:</strong></td>
-                            <td class="text-end"><strong class="text-entok">Rp {{ "{:,}".format(order.total_harga) }}</strong></td>
+                            <td colspan="3" class="text-end">Subtotal:</td>
+                            <td class="text-end">Rp {{ "{:,}".format(order.total_harga - order.ongkir) }}</td>
+                        </tr>
+                        <tr>
+                            <td colspan="3" class="text-end">Ongkir:</td>
+                            <td class="text-end">Rp {{ "{:,}".format(order.ongkir) }}</td>
+                        </tr>
+                        <tr>
+                            <td colspan="4" class="text-end border-0"><strong>Total:</strong></td>
+                            <td class="text-end border-0"><strong class="text-entok">Rp {{ "{:,}".format(order.total_harga) }}</strong></td>
                         </tr>
                     </tfoot>
                 </table>
@@ -99,39 +107,56 @@
     <div class="col-md-4">
         <div class="card">
             <div class="card-header bg-white">
-                <strong>Timeline</strong>
+                <strong><i class="bi bi-clock-history"></i> Status Pesanan</strong>
             </div>
             <div class="card-body">
                 <ul class="timeline list-unstyled">
                     <li class="mb-3">
                         <small class="text-muted">{{ order.created_at.strftime('%d-%m-%Y %H:%M') }}</small>
                         <p class="mb-0"><span class="badge bg-secondary">Pesanan Dibuat</span></p>
+                        <small class="text-muted">Menunggu konfirmasi</small>
                     </li>
                     {% if order.status in ['diproses', 'dikirim', 'selesai'] %}
                     <li class="mb-3">
                         <small class="text-muted">Diproses</small>
-                        <p class="mb-0"><span class="badge bg-warning">Sedang Diproses</span></p>
+                        <p class="mb-0"><span class="badge bg-warning text-dark">Sedang Diproses</span></p>
+                        <small class="text-muted">Pesanan sedang disiapkan</small>
                     </li>
                     {% endif %}
                     {% if order.status in ['dikirim', 'selesai'] %}
                     <li class="mb-3">
                         <small class="text-muted">{% if order.resi %}Resi: {{ order.resi }}{% endif %}</small>
                         <p class="mb-0"><span class="badge bg-info">Dalam Pengiriman</span></p>
+                        <small class="text-muted">Paket sedang di perjalanan</small>
                     </li>
                     {% endif %}
                     {% if order.status == 'selesai' %}
                     <li class="mb-3">
                         <small class="text-muted">Selesai</small>
                         <p class="mb-0"><span class="badge bg-success">Pesanan Selesai</span></p>
+                        <small class="text-muted">Pesanan telah diterima</small>
                     </li>
                     {% endif %}
                     {% if order.status == 'dibatalkan' %}
                     <li class="mb-3">
                         <small class="text-muted">Dibatalkan</small>
                         <p class="mb-0"><span class="badge bg-danger">Dibatalkan</span></p>
+                        <small class="text-muted">Pesanan dibatalkan</small>
                     </li>
                     {% endif %}
                 </ul>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header bg-white">
+                <strong><i class="bi bi-info-circle"></i> Petunjuk Status</strong>
+            </div>
+            <div class="card-body">
+                <p class="small mb-1"><span class="badge bg-secondary">Pending</span> - Pesanan baru dibuat, menunggu konfirmasi admin</p>
+                <p class="small mb-1"><span class="badge bg-warning text-dark">Diproses</span> - Pesanan sedang disiapkan oleh seller</p>
+                <p class="small mb-1"><span class="badge bg-info">Dikirim</span> - Pesanan sudah dikirim, tunggu pengiriman</p>
+                <p class="small mb-0"><span class="badge bg-success">Selesai</span> - Pesanan telah diterima buyer</p>
             </div>
         </div>
 

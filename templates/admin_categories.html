@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Kelola Kategori - EntokMart{% endblock %}
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-tags"></i> Kelola Kategori Produk</h2>
+
+<div class="mb-3">
+    <a href="{{ url_for('dashboard_admin') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Kembali ke Dashboard
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Tambah Kategori Baru</h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('admin_category_add') }}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="mb-3">
+                        <label class="form-label">Nama Kategori</label>
+                        <input type="text" name="name" class="form-control" placeholder="Contoh: Entok Dewasa" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Deskripsi (Opsional)</label>
+                        <textarea name="description" class="form-control" rows="2" placeholder="Deskripsi kategori..."></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-entok">
+                        <i class="bi bi-plus-lg"></i> Tambah Kategori
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="alert alert-info">
+            <h6><i class="bi bi-info-circle"></i> Info Kategori</h6>
+            <p class="mb-0 small">Kategori digunakan untuk mengelompokkan jenis produk. Setiap produk harus memilih satu kategori.</p>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header bg-white">
+        <h5 class="mb-0">Daftar Kategori ({{ categories|length }})</h5>
+    </div>
+    <div class="card-body">
+        {% if categories %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>No</th>
+                        <th>Nama Kategori</th>
+                        <th>Slug</th>
+                        <th>Deskripsi</th>
+                        <th>Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in categories %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td><strong>{{ c.name }}</strong></td>
+                        <td><code>{{ c.slug }}</code></td>
+                        <td>{{ c.description[:50] if c.description else '-' }}{% if c.description and c.description|length > 50 %}...{% endif %}</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editModal{{ c.id }}">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <form action="{{ url_for('admin_category_delete', id=c.id) }}" method="POST" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Hapus kategori {{ c.name }}?')">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    
+                    <!-- Edit Modal -->
+                    <div class="modal fade" id="editModal{{ c.id }}" tabindex="-1">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Edit Kategori</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <form action="{{ url_for('admin_category_edit', id=c.id) }}" method="POST">
+                                    <div class="modal-body">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <div class="mb-3">
+                                            <label class="form-label">Nama Kategori</label>
+                                            <input type="text" name="name" class="form-control" value="{{ c.name }}" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Deskripsi</label>
+                                            <textarea name="description" class="form-control" rows="2">{{ c.description or '' }}</textarea>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                                        <button type="submit" class="btn btn-entok">Simpan</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle"></i> Belum ada kategori. Silakan tambah kategori terlebih dahulu.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
