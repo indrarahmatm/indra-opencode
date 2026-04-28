@@ -7,6 +7,17 @@ from flask import render_template, redirect, url_for, request, flash, send_from_
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.utils import secure_filename
 from app import app, mail, db, csrf, cache
+import logging
+import datetime
+
+# Configure security logging
+security_logger = logging.getLogger('security')
+security_handler = logging.FileHandler('instance/security.log')
+security_handler.setLevel(logging.WARNING)
+security_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+security_handler.setFormatter(security_formatter)
+security_logger.addHandler(security_handler)
+security_logger.setLevel(logging.WARNING)
 from models import User, Product, Order, OrderItem, Review, Wishlist, Category, ProductImage, Chat, ShippingCourier, ShippingZone, FreeShippingPromo, Setting
 from services.midtrans import (
     is_midtrans_enabled, create_snap_token, check_transaction_status,
@@ -384,6 +395,7 @@ def login():
                 return render_template('login.html')
             
             login_user(user, remember=True)
+            security_logger.warning(f'LOGIN_SUCCESS: {email} from {request.remote_addr}')
             flash('Login berhasil', 'success')
             if user.role == 'peternak':
                 return redirect(url_for('dashboard_peternak'))
@@ -391,6 +403,7 @@ def login():
                 return redirect(url_for('dashboard_buyer'))
             else:
                 return redirect(url_for('dashboard_admin'))
+        security_logger.warning(f'LOGIN_FAILED: {email} from {request.remote_addr}')
         flash('Email atau password salah', 'danger')
     return render_template('login.html')
 

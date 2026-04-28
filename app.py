@@ -6,11 +6,35 @@ from flask_wtf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_caching import Cache
+from flask_compress import Compress
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', os.urandom(32).hex())
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///entokmart.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# Database Connection Pool (for production with PostgreSQL)
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_size': 10,
+    'pool_recycle': 3600,
+    'pool_pre_ping': True,
+}
+# JSON optimization
+app.config['JSON_SORT_KEYS'] = False
+app.config['JSONIFY_PRETTYPRINT_REGULAR'] = False
+
+# Security Headers (WAF-like protection)
+@app.after_request
+def add_security_headers(response):
+    """Add security headers to all responses"""
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    response.headers['Content-Security-Policy'] = "default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data:; img-src 'self' data: https:; font-src 'self' https: data:;"
+    return response
+
+# Login rate limiting
+app.config['LOGIN_DISABLED'] = False
 
 app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production'
 app.config['SESSION_COOKIE_HTTPONLY'] = True
@@ -61,6 +85,13 @@ limiter = Limiter(
 
 # Initialize cache
 cache = Cache(app)
+
+# Initialize compression for faster response
+Compress(app)
+Compress.init_app(app, {
+    'gzip_level': 6,
+    'gzip_ignore': ['text/html'],
+})
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
