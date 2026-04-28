@@ -105,17 +105,17 @@
     <div class="col-md-3">
         <div class="card bg-info text-white">
             <div class="card-body">
-                <h6 class="mb-2">Revenue</h6>
+                <h6 class="mb-2">Total Revenue</h6>
                 <h2 class="mb-0">Rp {{ "{:,}".format(stats.total_revenue) }}</h2>
-                <small class="text-white-50">Comm: Rp {{ "{:,}".format(stats.commission_revenue) }} + Service: Rp {{ "{:,}".format(stats.service_revenue) }}</small>
             </div>
         </div>
     </div>
     <div class="col-md-3">
         <div class="card bg-warning text-white">
             <div class="card-body">
-                <h6 class="mb-2">Pending</h6>
-                <h2 class="mb-0">{{ stats.pending_orders }}</h2>
+                <h6 class="mb-2">Admin Revenue</h6>
+                <h2 class="mb-0">Rp {{ "{:,}".format(stats.commission_revenue|default(0) + stats.service_revenue|default(0)) }}</h2>
+                <small class="text-white-50">Comm: Rp {{ "{:,}".format(stats.commission_revenue|default(0)) }} + Service: Rp {{ "{:,}".format(stats.service_revenue|default(0)) }}</small>
             </div>
         </div>
     </div>
