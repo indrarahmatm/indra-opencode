@@ -1,11 +1,19 @@
 import re
 import os
-from datetime import datetime
-from flask import render_template, redirect, url_for, request, flash, send_from_directory, session
+import io
+from datetime import datetime, timedelta
+from flask import render_template, redirect, url_for, request, flash, send_from_directory, session, make_response
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.utils import secure_filename
-from app import app, mail, db
+from app import app, mail, db, csrf
 from models import User, Product, Order, OrderItem, Review, Wishlist, Category, ProductImage, Chat
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch, mm
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 
 # ======================
 # TELEGRAM INTEGRATION
@@ -73,6 +81,7 @@ def telegram_api_reply():
     
     return {'success': True, 'message': 'Reply sent'}
 
+@csrf.exempt
 @app.route('/api/telegram/chat', methods=['POST'])
 def telegram_api_chat():
     """API endpoint for Telegram bot to receive user messages"""
@@ -177,6 +186,12 @@ def index():
     categories = Category.query.all()
     return render_template('index.html', products=products, categories=categories)
 
+@app.route('/produk')
+def produk():
+    products = Product.query.all()
+    categories = Category.query.all()
+    return render_template('index.html', products=products, categories=categories)
+
 @app.route('/produk/search')
 def search_produk():
     q = request.args.get('q', '').strip()
@@ -261,6 +276,51 @@ def logout():
     logout_user()
     return redirect(url_for('index'))
 
+@app.route('/password/reset', methods=['GET', 'POST'])
+def password_reset_request():
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip()
+        user = User.query.filter_by(email=email).first()
+        
+        if user:
+            import secrets
+            token = secrets.token_urlsafe(32)
+            user.token_reset = token
+            user.token_expiry = datetime.now() + timedelta(minutes=30)
+            db.session.commit()
+            
+            reset_link = url_for('password_reset', token=token, _external=True)
+            flash(f'Link reset: {reset_link}', 'info')
+            return redirect(url_for('login'))
+        
+        flash('Email tidak ditemukan', 'warning')
+    return render_template('password_reset_request.html')
+
+@app.route('/password/reset/<token>', methods=['GET', 'POST'])
+def password_reset(token):
+    user = User.query.filter_by(token_reset=token).first()
+    
+    if not user or user.token_expiry < datetime.now():
+        flash('Token expired atau invalid', 'danger')
+        return redirect(url_for('login'))
+    
+    if request.method == 'POST':
+        new_password = request.form.get('password')
+        
+        if len(new_password) < 6:
+            flash('Password minimal 6 karakter', 'danger')
+            return redirect(url_for('password_reset', token=token))
+        
+        user.set_password(new_password)
+        user.token_reset = None
+        user.token_expiry = None
+        db.session.commit()
+        
+        flash('Password berhasil diupdate! Silakan login', 'success')
+        return redirect(url_for('login'))
+    
+    return render_template('password_reset_form.html')
+
 @app.route('/dashboard-peternak')
 @login_required
 def dashboard_peternak():
@@ -268,6 +328,35 @@ def dashboard_peternak():
         return redirect(url_for('index'))
     products = Product.query.filter_by(seller_id=current_user.id).all()
     return render_template('dashboard_peternak.html', products=products)
+
+@app.route('/toko/<username>')
+def toko(username):
+    user = User.query.filter_by(username=username).first_or_404()
+    
+    if not user.nama_toko:
+        flash('Toko tidak ditemukan', 'warning')
+        return redirect(url_for('index'))
+    
+    products = Product.query.filter_by(seller_id=user.id, stok__gt=0).all()
+    return render_template('toko.html', seller=user, products=products)
+
+@app.route('/toko/edit', methods=['GET', 'POST'])
+@login_required
+def toko_edit():
+    if current_user.role != 'peternak':
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        current_user.nama_toko = request.form.get('nama_toko', '').strip()
+        current_user.deskripsi_toko = request.form.get('deskripsi_toko', '').strip()
+        current_user.no_hp = request.form.get('no_hp', '').strip()
+        current_user.alamat = request.form.get('alamat', '').strip()
+        db.session.commit()
+        
+        flash('Toko berhasil diupdate!', 'success')
+        return redirect(url_for('dashboard_peternak'))
+    
+    return render_template('toko_edit.html')
 
 @app.route('/produk/baru', methods=['GET', 'POST'])
 @login_required
@@ -493,24 +582,98 @@ def checkout():
             flash('Semua field wajib diisi', 'danger')
             return redirect(url_for('checkout'))
 
-        total_harga = 0
+        subtotal = 0
+        total_weight_kg = 0.0
         insufficient_stock = []
         for item in cart:
             product = Product.query.get(item['product_id'])
             if product:
                 if item['jumlah'] > product.stok:
                     insufficient_stock.append(f"{product.name} (tersedia: {product.stok})")
-                total_harga += product.harga * item['jumlah']
+                subtotal += product.harga * item['jumlah']
+                total_weight_kg += product.berat_kg * item['jumlah']
+        
+        # Calculate shipping cost (ongkir)
+        if total_weight_kg <= 0:
+            ongkir = 0
+        else:
+            # Base cost 5000 for first kg, then 3000 per additional kg
+            ongkir = int(5000 + max(0, (total_weight_kg - 1) * 3000))
+        
+        # Total harga includes ongkir
+        total_harga = subtotal + ongkir
         
         if insufficient_stock:
             flash(f'Stok tidak mencukupi: {", ".join(insufficient_stock)}', 'danger')
             return redirect(url_for('keranjang'))
-
+        
         order = Order(buyer_id=current_user.id, total_harga=total_harga,
-                     nama_penerima=nama_penerima, alamat=alamat, telp=telp,
-                     payment_method=payment_method, payment_status='pending')
+                      nama_penerima=nama_penerima, alamat=alamat, telp=telp,
+                      payment_method=payment_method, payment_status='pending',
+                      ongkir=ongkir)
         db.session.add(order)
         db.session.commit()
+        
+        for item in cart:
+            product = Product.query.get(item['product_id'])
+            if product:
+                order_item = OrderItem(order_id=order.id, product_id=product.id,
+                                       jumlah=item['jumlah'], harga_saat_beli=product.harga,
+                                       nama_product=product.name, nama_peternak=product.seller.username)
+                db.session.add(order_item)
+                product.stok -= item['jumlah']
+        
+        db.session.commit()
+        
+        # Clear cart
+        session['cart'] = []
+        
+        # Send email confirmation (if mail is configured)
+        try:
+            from flask_mail import Message
+            if app.config.get('MAIL_USERNAME'):
+                msg = Message(
+                    subject=f"EntokMart - Pesanan #{order.id} Diterima",
+                    recipients=[current_user.email],
+                    body=f"Halo {current_user.username},\n\nTerima kasih! Pesanan #{order.id} Anda telah diterima.\n\nSubtotal: Rp {subtotal:,}\nOngkir: Rp {ongkir:,}\nTotal: Rp {total_harga:,}\nMetode: {payment_method.upper()}\n\nKami akan segera memproses pesanan Anda."
+                )
+                mail.send(msg)
+        except Exception as e:
+            app.logger.error(f"Failed to send email: {e}")
+        
+        # Notify admin via Telegram
+        try:
+            telegram_notify_order(order, event_type='new')
+        except Exception as e:
+            app.logger.error(f"Telegram notification failed: {e}")
+        
+        flash('Pesanan berhasil dibuat!', 'success')
+        return redirect(url_for('pesanan_saya'))
+        
+        # Clear cart
+        session['cart'] = []
+        
+        # Send email confirmation (if mail is configured)
+        try:
+            from flask_mail import Message
+            if app.config.get('MAIL_USERNAME'):
+                msg = Message(
+                    subject=f"EntokMart - Pesanan #{order.id} Diterima",
+                    recipients=[current_user.email],
+                    body=f"Halo {current_user.username},\n\nTerima kasih! Pesanan #{order.id} Anda telah diterima.\n\nSubtotal: Rp {subtotal:,}\nOngkir: Rp {ongkir:,}\nTotal: Rp {total_harga:,}\nMetode: {payment_method.upper()}\n\nKami akan segera memproses pesanan Anda."
+                )
+                mail.send(msg)
+        except Exception as e:
+            app.logger.error(f"Failed to send email: {e}")
+        
+        # Notify admin via Telegram
+        try:
+            telegram_notify_order(order, event_type='new')
+        except Exception as e:
+            app.logger.error(f"Telegram notification failed: {e}")
+        
+        flash('Pesanan berhasil dibuat!', 'success')
+        return redirect(url_for('pesanan_saya'))
         
         for item in cart:
             product = Product.query.get(item['product_id'])
@@ -542,12 +705,27 @@ def checkout():
         flash(f'Pesanan berhasil dibuat! ({payment_method.upper()})', 'success')
         return redirect(url_for('pesanan_saya'))
 
-    total = 0
+    # GET request - calculate totals for display
+    subtotal = 0
+    total_weight_kg = 0.0
     for item in cart:
         product = Product.query.get(item['product_id'])
         if product:
-            total += product.harga * item['jumlah']
-    return render_template('checkout.html', total=total)
+            subtotal += product.harga * item['jumlah']
+            total_weight_kg += product.berat_kg * item['jumlah']
+    
+        # Calculate shipping cost (ongkir)
+        if total_weight_kg <= 0:
+            ongkir = 0
+        else:
+            # Base cost 5000 for first kg, then 3000 per additional kg
+            ongkir = int(5000 + max(0, (total_weight_kg - 1) * 3000))
+    
+    # Total harga includes ongkir
+    total_harga = subtotal + ongkir
+    
+    # GET request - display checkout form with totals
+    return render_template('checkout.html', subtotal=subtotal, ongkir=ongkir, total=total_harga)
 
 @app.route('/pesanan-saya')
 @login_required
@@ -594,6 +772,115 @@ def pesanan_detail(order_id):
         return redirect(url_for('pesanan_saya'))
     
     return render_template('pesanan_detail.html', order=order)
+
+@app.route('/pesanan-saya/invoice/<int:order_id>')
+@login_required
+def pesanan_invoice(order_id):
+    if current_user.role != 'buyer':
+        return redirect(url_for('index'))
+    
+    order = Order.query.get_or_404(order_id)
+    if order.buyer_id != current_user.id:
+        flash('Akses ditolak', 'danger')
+        return redirect(url_for('pesanan_saya'))
+    
+    # Only allow invoice for completed orders
+    if order.status != 'selesai':
+        flash('Invoice hanya dapat dibuat untuk pesanan yang selesai', 'warning')
+        return redirect(url_for('pesanan_detail', order_id=order.id))
+    
+    # Generate PDF
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=18)
+    elements = []
+    
+    # Styles
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=24,
+        spaceAfter=30,
+        alignment=1  # center
+    )
+    
+    # Company info
+    elements.append(Paragraph("EntokMart", title_style))
+    elements.append(Paragraph("Marketplace untuk Peternak Entok", styles['Normal']))
+    elements.append(Paragraph("https://entokmart.example.com", styles['Normal']))
+    elements.append(Spacer(1, 20))
+    
+    # Invoice title
+    elements.append(Paragraph(f"INVOICE / PESANAN #{order.id}", styles['Heading2']))
+    elements.append(Spacer(1, 12))
+    
+    # Date and order info
+    date_str = order.created_at.strftime("%d %B %Y")
+    elements.append(Paragraph(f"Tanggal: {date_str}", styles['Normal']))
+    elements.append(Paragraph(f"Status Pembayaran: {order.payment_status}", styles['Normal']))
+    elements.append(Spacer(1, 12))
+    
+    # Customer info
+    elements.append(Paragraph("Bill To:", styles['Heading3']))
+    elements.append(Paragraph(f"{order.nama_penerima}", styles['Normal']))
+    elements.append(Paragraph(f"{order.alamat}", styles['Normal']))
+    elements.append(Paragraph(f"Telp: {order.telp}", styles['Normal']))
+    elements.append(Spacer(1, 20))
+    
+    # Order items table
+    data = [['Produk', 'Peternak', 'Qty', 'Harga Satuan', 'Subtotal']]
+    for item in order.items:
+        data.append([
+            item.nama_product,
+            item.nama_peternak,
+            str(item.jumlah),
+            f"Rp {item.harga_saat_beli:,}",
+            f"Rp {item.harga_saat_beli * item.jumlah:,}"
+        ])
+    
+    # Add total row
+    data.append(['', '', '', 'Total:', f"Rp {order.total_harga:,}"])
+    
+    table = Table(data, colWidths=[80*mm, 50*mm, 20*mm, 30*mm, 30*mm])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -2), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, -1), (-1, -1), 10),
+        ('ALIGN', (-2, -1), (-1, -1), 'RIGHT'),
+    ]))
+    
+    elements.append(table)
+    elements.append(Spacer(1, 20))
+    
+    # Payment method
+    elements.append(Paragraph(f"Metode Pembayaran: {order.payment_method.upper()}", styles['Normal']))
+    if order.payment_method == 'manual' and order.transfer_proof_url:
+        elements.append(Paragraph("Bukti Transfer: Telah diupload dan diverifikasi", styles['Normal']))
+    elements.append(Spacer(1, 20))
+    
+    # Footer
+    elements.append(Paragraph("Terima kasih telah berbelanja di EntokMart!", styles['Italic']))
+    elements.append(Paragraph("Untuk pertanyaan, hubungi kami melalui live chat atau Telegram @ecomm1_bot", styles['Normal']))
+    
+    # Build PDF
+    doc.build(elements)
+    
+    buffer.seek(0)
+    return make_response(
+        buffer.getvalue(),
+        200,
+        {
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': f'attachment; filename=invoice_entokmart_{order.id}.pdf'
+        }
+    )
 
 @app.route('/bukti-transfer/<int:order_id>', methods=['GET', 'POST'])
 @login_required
@@ -789,9 +1076,44 @@ def lihat_bukti_transfer(order_id):
 def dashboard_admin():
     if current_user.role != 'admin':
         return redirect(url_for('index'))
+    
     users = User.query.all()
     orders = Order.query.order_by(Order.created_at.desc()).all()
-    return render_template('dashboard_admin.html', users=users, orders=orders)
+    
+    # Analytics
+    total_users = User.query.count()
+    total_orders = Order.query.count()
+    total_revenue = sum(o.total_harga for o in Order.query.all() if o.status != 'cancelled')
+    pending_orders = Order.query.filter_by(status='pending').count()
+    processing_orders = Order.query.filter_by(status='processing').count()
+    completed_orders = Order.query.filter_by(status='completed').count()
+    
+    # Recent stats (last 7 days)
+    from datetime import datetime, timedelta
+    week_ago = datetime.now() - timedelta(days=7)
+    recent_orders = Order.query.filter(Order.created_at >= week_ago).count()
+    
+    # Top products
+    order_items = OrderItem.query.all()
+    product_counts = {}
+    for item in order_items:
+        if item.nama_product:
+            product_counts[item.nama_product] = product_counts.get(item.nama_product, 0) + item.jumlah
+    
+    top_products = sorted(product_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+    
+    stats = {
+        'total_users': total_users,
+        'total_orders': total_orders,
+        'total_revenue': total_revenue,
+        'pending_orders': pending_orders,
+        'processing_orders': processing_orders,
+        'completed_orders': completed_orders,
+        'recent_orders': recent_orders,
+        'top_products': top_products
+    }
+    
+    return render_template('dashboard_admin.html', users=users, orders=orders, stats=stats)
 
 @app.route('/admin/user/edit/<int:id>', methods=['GET', 'POST'])
 @login_required
@@ -903,14 +1225,21 @@ def bandingkan_clear():
 @login_required
 def chat():
     selected_user_id = request.args.get('user_id', type=int)
+    app.logger.debug(f"CHAT DEBUG: user_id from args = {selected_user_id}, type = {type(selected_user_id)}")
     selected_user = None
     
     if current_user.role == 'admin':
-        chats = Chat.query.order_by(Chat.created_at.desc()).all()
         users_with_chats = User.query.join(Chat).distinct().all()
+        user_chats = []
+        
         if selected_user_id:
-            selected_user = User.query.get(selected_user_id)
-        return render_template('chat_admin.html', chats=chats, users=users_with_chats, selected_user=selected_user)
+            selected_user = User.query.filter_by(id=selected_user_id).first()
+            app.logger.error(f"CHAT DEBUG: selected_user = {selected_user}")
+            if selected_user:
+                user_chats = Chat.query.filter_by(user_id=selected_user_id).order_by(Chat.created_at.asc()).all()
+                app.logger.error(f"CHAT DEBUG: chats count = {len(user_chats)}")
+        
+        return render_template('chat_admin.html', chats=user_chats, users=users_with_chats, selected_user=selected_user)
     else:
         chats = Chat.query.filter_by(user_id=current_user.id).order_by(Chat.created_at.asc()).all()
         return render_template('chat.html', chats=chats)
@@ -956,7 +1285,7 @@ def chat_read(user_id):
     
     Chat.query.filter_by(user_id=user_id, is_from_admin=False, is_read=False).update({'is_read': True})
     db.session.commit()
-    return redirect(url_for('chat'))
+    return redirect(url_for('chat', user_id=user_id))
 
 @app.route('/produk/<int:product_id>/review', methods=['GET', 'POST'])
 @login_required

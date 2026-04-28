@@ -37,8 +37,9 @@ csrf = CSRFProtect(app)
 limiter = Limiter(
     get_remote_address,
     app=app,
-    default_limits=["200 per day", "50 per hour"],
+    default_limits=["20000 per day", "5000 per hour"],
     storage_uri="memory://",
+    enabled=False,
 )
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -57,10 +58,16 @@ def load_user(user_id):
 
 from routes import *
 
+@app.template_filter('format_number')
+def format_number(value):
+    if value is None:
+        return "0"
+    return "{:,}".format(int(value))
+
 if __name__ == '__main__':
     debug = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
     port = int(os.environ.get('PORT', 5003))
     with app.app_context():
         db.create_all()
         Category.get_default_categories()
-    app.run(debug=debug, port=port, use_reloader=False)
+    app.run(debug=debug, port=port, use_reloader=False, host='0.0.0.0')

@@ -13,7 +13,7 @@
         <div class="mb-3 {% if c.is_from_admin %}text-start{% else %}text-end{% endif %}">
             <div class="d-inline-block p-3 rounded {% if c.is_from_admin %}bg-light{% else %}bg-entok text-white{% endif %}" style="max-width: 80%;">
                 <p class="mb-0">{{ c.pesan }}</p>
-                <small class="{% if c.is_from_admin %}text-muted{% else %}text-white-50{% endif %}">{{ c.created_at.strftime('%H:%M') }}</small>
+                <small class="{% if c.is_from_admin %}text-muted{% else %}text-white-50{% endif %}">{{ c.created_at.strftime('%d/%m/%y %H:%M') }}</small>
             </div>
         </div>
         {% else %}
@@ -25,6 +25,7 @@
     </div>
     <div class="card-footer bg-white">
         <form action="{{ url_for('chat_kirim') }}" method="POST" class="d-flex gap-2">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="text" name="pesan" class="form-control" placeholder="Ketik pesan..." required>
             <button type="submit" class="btn btn-entok"><i class="bi bi-send"></i></button>
         </form>

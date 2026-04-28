@@ -19,7 +19,8 @@
         </div>
     </div>
     <div class="card-footer bg-white">
-        <form action="/pesanan/update/{{ item.order.id }}" method="POST">
+        <form action="{{ url_for('pesanan_update', id=item.order.id) }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="row g-3">
                 <div class="col-md-2">
                     <label class="form-label small">Status</label>

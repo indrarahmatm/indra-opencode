@@ -23,7 +23,8 @@
             </div>
         </div>
 
-        <form method="POST" enctype="multipart/form-data">
+        <form method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"> enctype="multipart/form-data">
             <div class="mb-3">
                 <label class="form-label">Pilih File Bukti Transfer</label>
                 <input type="file" name="bukti" class="form-control" accept="image/*" required>

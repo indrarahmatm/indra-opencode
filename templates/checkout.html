@@ -9,7 +9,8 @@
                 <h5 class="mb-0"><i class="bi bi-truck"></i> Alamat Pengiriman</h5>
             </div>
             <div class="card-body">
-                <form method="POST" id="checkoutForm">
+                 <form method="POST" id="checkoutForm">
+                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="mb-3">
                         <label class="form-label">Nama Penerima</label>
                         <input type="text" name="nama_penerima" class="form-control" required>
@@ -64,13 +65,21 @@
                 <h5 class="mb-0">Rincian Pesanan</h5>
             </div>
             <div class="card-body">
-                <h3 class="text-accent">Total: Rp {{ "{:,}".format(total) }}</h3>
-                <hr>
-                <p class="small text-muted">
-                    <i class="bi bi-info-circle"></i> 
-                    {% if total < 500000 %}Gratis ongkir{% else %}Gratis ongkir{% endif %}
-                </p>
-                <button type="submit" form="checkoutForm" class="btn btn-entok w-100 py-2">
+                 <div class="mb-3">
+                     <div class="d-flex justify-content-between">
+                         <span>Subtotal:</span>
+                         <span>Rp {{ "{:,}".format(subtotal) }}</span>
+                     </div>
+                 </div>
+                 <div class="mb-3">
+                     <div class="d-flex justify-content-between">
+                         <span>Ongkir:</span>
+                         <span>Rp {{ "{:,}".format(ongkir) }}</span>
+                     </div>
+                 </div>
+                 <hr>
+                 <h3 class="text-accent">Total: Rp {{ "{:,}".format(total) }}</h3>
+                <button type="submit" class="btn btn-entok w-100 py-2">
                     <i class="bi bi-cart-check"></i> Pesan Sekarang
                 </button>
             </div>

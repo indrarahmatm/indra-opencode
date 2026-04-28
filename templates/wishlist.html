@@ -27,7 +27,8 @@
             <div class="card-footer bg-white border-0">
                 <div class="d-flex justify-content-between">
                     {% if w.product.stok > 0 %}
-                    <form action="/keranjang/tambah/{{ w.product.id }}" method="POST">
+                    <form>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">/tambah/{{ w.product.id }}" method="POST">
                         <input type="number" name="jumlah" value="1" min="1" max="{{ w.product.stok }}" class="form-control form-control-sm d-inline" style="width: 60px;">
                         <button type="submit" class="btn btn-entok btn-sm"><i class="bi bi-cart-plus"></i></button>
                     </form>

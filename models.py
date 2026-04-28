@@ -1,6 +1,9 @@
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+def get_wib():
+    return datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=7)))
 from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
@@ -11,6 +14,16 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(150), unique=True, nullable=False)
     password_hash = db.Column(db.String(200), nullable=False)
     role = db.Column(db.String(20), nullable=False)
+    
+    # Vendor/Store fields
+    nama_toko = db.Column(db.String(150), nullable=True)
+    deskripsi_toko = db.Column(db.Text, nullable=True)
+    no_hp = db.Column(db.String(20), nullable=True)
+    alamat = db.Column(db.Text, nullable=True)
+    verifikasi = db.Column(db.Boolean, default=False)
+    
+    token_reset = db.Column(db.String(100), nullable=True)
+    token_expiry = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def set_password(self, password):
@@ -109,6 +122,7 @@ class Order(db.Model):
     transfer_proof_url = db.Column(db.String(300))
     # Shipping
     resi = db.Column(db.String(50))
+    ongkir = db.Column(db.Integer, default=0)
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

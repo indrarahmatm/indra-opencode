@@ -28,22 +28,20 @@
     </div>
     <div class="col-md-8">
         <div class="card">
-            <div class="card-header bg-white">
-                <strong>Percakapan</strong>
+<div class="card-header bg-white">
+                <strong>Percakapan</strong> <small class="text-muted">(user={{ selected_user.username if selected_user else 'none' }}, chats={{ chats|length }})</small>
             </div>
             <div class="card-body" style="height: 400px; overflow-y: auto;" id="chatbox">
-                {% if selected_user %}
+                {% if selected_user and chats %}
                 {% for c in chats %}
-                {% if c.user_id == selected_user.id %}
                 <div class="mb-3 {% if c.is_from_admin %}text-end{% else %}text-start{% endif %}">
-                    <div class="d-inline-block p-3 rounded {% if c.is_from_admin %}bg-entok text-white{% else %}bg-light{% endif %}" style="max-width: 80%;">
-                        <p class="mb-0">{{ c.pesan }}</p>
-                        <small class="{% if c.is_from_admin %}text-white-50{% else %}text-muted{% endif %}">{{ c.created_at.strftime('%H:%M') }}</small>
+                    <div class="d-inline-block p-3 rounded shadow-sm {% if c.is_from_admin %}text-white{% else %}bg-white border{% endif %}" style="max-width: 80%; {% if c.is_from_admin %}background: linear-gradient(135deg, #7C3AED 0%, #4C1D95 100%);{% endif %}">
+                        <p class="mb-0 {% if not c.is_from_admin %}text-dark{% endif %}">{{ c.pesan }}</p>
+                        <small class="{% if c.is_from_admin %}text-white-50{% else %}text-muted{% endif %}">{{ c.created_at.strftime('%d/%m/%y %H:%M') }}</small>
                     </div>
                 </div>
-                {% endif %}
                 {% endfor %}
-                {% else %}
+                {% elif not selected_user %}
                 <div class="text-center text-muted py-5">
                     <i class="bi bi-cursor fs-1"></i>
                     <p class="mt-3">Pilih pengguna di sebelah kiri untuk melihat percakapan</p>
@@ -53,6 +51,7 @@
             {% if selected_user %}
             <div class="card-footer bg-white">
                 <form action="{{ url_for('chat_admin_kirim', user_id=selected_user.id) }}" method="POST" class="d-flex gap-2">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="text" name="pesan" class="form-control" placeholder="Balas pesan..." required>
                     <button type="submit" class="btn btn-entok"><i class="bi bi-send"></i></button>
                 </form>

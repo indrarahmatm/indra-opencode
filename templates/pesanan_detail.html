@@ -135,16 +135,21 @@
             </div>
         </div>
 
-        <div class="d-grid gap-2 mt-3">
-            {% if order.status in ['pending', 'diproses'] %}
-            <a href="{{ url_for('pesanan_batal', order_id=order.id) }}" class="btn btn-outline-danger" onclick="return confirm('Batalkan pesanan?')">
-                <i class="bi bi-x-circle"></i> Batalkan Pesanan
-            </a>
-            {% endif %}
-            <a href="{{ url_for('pesanan_saya') }}" class="btn btn-outline-secondary">
-                <i class="bi bi-arrow-left"></i> Kembali
-            </a>
-        </div>
+         <div class="d-grid gap-2 mt-3">
+             {% if order.status in ['pending', 'diproses'] %}
+             <a href="{{ url_for('pesanan_batal', order_id=order.id) }}" class="btn btn-outline-danger" onclick="return confirm('Batalkan pesanan?')">
+                 <i class="bi bi-x-circle"></i> Batalkan Pesanan
+             </a>
+             {% endif %}
+             {% if order.status == 'selesai' %}
+             <a href="{{ url_for('pesanan_invoice', order_id=order.id) }}" class="btn btn-outline-success">
+                 <i class="bi bi-file-earmark-pdf"></i> Unduh Invoice
+             </a>
+             {% endif %}
+             <a href="{{ url_for('pesanan_saya') }}" class="btn btn-outline-secondary">
+                 <i class="bi bi-arrow-left"></i> Kembali
+             </a>
+         </div>
     </div>
 </div>
 {% endblock %}

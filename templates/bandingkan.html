@@ -86,7 +86,11 @@
                         {% for p in products %}
                         <td>
                             {% if p.stok > 0 %}
-                            <form action="/keranjang/tambah/{{ p.id }}" method="POST" class="d-inline">
+                            <form>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <form action="/keranjang/tambah/{{ p.id }}" method="POST" class="d-inline">
                                 <input type="number" name="jumlah" value="1" min="1" class="form-control form-control-sm d-inline" style="width: 60px;">
                                 <button type="submit" class="btn btn-entok btn-sm"><i class="bi bi-cart-plus"></i></button>
                             </form>

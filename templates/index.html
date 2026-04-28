@@ -96,7 +96,8 @@
             <div class="card-footer bg-white border-0">
                 <div class="d-flex justify-content-between align-items-center">
                     {% if p.stok > 0 %}
-                    <form action="/keranjang/tambah/{{ p.id }}" method="POST" class="d-flex">
+                    <form action="{{ url_for('keranjang_tambah', product_id=p.id) }}" method="POST" class="d-flex">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="number" name="jumlah" value="1" min="1" max="{{ p.stok }}" class="form-control form-control-sm" style="width: 70px;">
                         <button class="btn btn-entok btn-sm ms-2"><i class="bi bi-cart-plus"></i> Tambah</button>
                     </form>
