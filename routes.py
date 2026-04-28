@@ -11,13 +11,18 @@ import logging
 import datetime
 
 # Configure security logging
+import os
+log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance')
+os.makedirs(log_dir, exist_ok=True)
 security_logger = logging.getLogger('security')
-security_handler = logging.FileHandler('instance/security.log')
-security_handler.setLevel(logging.WARNING)
-security_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-security_handler.setFormatter(security_formatter)
-security_logger.addHandler(security_handler)
 security_logger.setLevel(logging.WARNING)
+# Avoid adding handlers multiple times
+if not security_logger.handlers:
+    security_handler = logging.FileHandler(os.path.join(log_dir, 'security.log'))
+    security_handler.setLevel(logging.WARNING)
+    security_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    security_handler.setFormatter(security_formatter)
+    security_logger.addHandler(security_handler)
 from models import User, Product, Order, OrderItem, Review, Wishlist, Category, ProductImage, Chat, ShippingCourier, ShippingZone, FreeShippingPromo, Setting
 from services.midtrans import (
     is_midtrans_enabled, create_snap_token, check_transaction_status,
@@ -680,7 +685,7 @@ def keranjang_tambah(product_id):
     if existing:
         new_qty = existing['jumlah'] + jumlah
         if new_qty > product.stok:
-            flash(f'Stok tidak mencukupi. Total di keranjang: {existing["jumlah"] + product.stok}', 'warning')
+            flash(f'Stok tidak mencukupi. Tersedia: {product.stok}', 'warning')
             return redirect(url_for('keranjang'))
         existing['jumlah'] = new_qty
     else:
@@ -1262,6 +1267,12 @@ def dashboard_admin():
     processing_orders = Order.query.filter_by(status='processing').count()
     completed_orders = Order.query.filter_by(status='completed').count()
     
+    # Revenue breakdown: Commission (5%) + Service Fee (Rp 2000 per order)
+    commission_rate = 0.05  # 5%
+    service_fee = 2000  # Rp 2000 per order
+    commission_revenue = sum(o.total_harga * commission_rate for o in Order.query.all() if o.status != 'cancelled')
+    service_revenue = sum(service_fee for o in Order.query.all() if o.status != 'cancelled')
+    
     # Recent stats (last 7 days)
     from datetime import datetime, timedelta
     week_ago = datetime.now() - timedelta(days=7)
@@ -1280,6 +1291,8 @@ def dashboard_admin():
         'total_users': total_users,
         'total_orders': total_orders,
         'total_revenue': total_revenue,
+        'commission_revenue': commission_revenue,
+        'service_revenue': service_revenue,
         'pending_orders': pending_orders,
         'processing_orders': processing_orders,
         'completed_orders': completed_orders,
@@ -2312,7 +2325,7 @@ def api_create_snap():
     if not order:
         return {'success': False, 'message': 'Order not found'}, 404
     
-    if order.total_amount != amount:
+    if order.total_harga != amount:
         return {'success': False, 'message': 'Amount mismatch'}, 400
     
     # Build customer details
