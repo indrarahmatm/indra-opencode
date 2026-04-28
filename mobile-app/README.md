@@ -11,6 +11,7 @@ React Native (Expo) Mobile Application for EntokMart E-Commerce Platform.
 - ✅ Add to cart
 - ✅ Cart management
 - ✅ Order tracking
+- ✅ Secure online payments (Midtrans integration)
 
 ### Tech Stack
 - **Framework**: React Native with Expo

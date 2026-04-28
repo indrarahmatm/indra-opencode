@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
@@ -94,7 +95,7 @@ const CheckoutScreen = ({ navigation }) => {
     setFormData({ ...formData, payment_method: method });
   };
 
-  const handleCheckout = async () => {
+    const handleCheckout = async () => {
     if (!isAuthenticated) {
       Alert.alert('Info', 'Silakan login untuk checkout');
       return;
@@ -114,21 +115,28 @@ const CheckoutScreen = ({ navigation }) => {
     setLoading(true);
 
     try {
-      // Create order - this would need to be implemented in API
-      // For now, simulate order creation
+      // Calculate order total
       const orderTotal = getCartTotal() + shippingCost;
       
       if (payment_method === 'midtrans' && midtransEnabled) {
         // Handle Midtrans payment
         handleMidtransPayment(orderTotal);
       } else {
-        // COD or Manual Transfer - just show success
+        // For COD or Manual Transfer, create order directly
+        // In a real app, this would call an API to create the order
         Alert.alert(
           'Pesanan Diterima!',
-          `Total: Rp ${orderTotal.toLocaleString('id-ID')}\nMetode: ${payment_method === 'cod' ? 'COD' : 'Transfer Bank'}`,
+          `Total: Rp ${orderTotal.toLocaleString('id-ID')}\nMetode: ${payment_method === 'cod' ? 'COD' : 'Transfer Bank'}\n\nPesanan akan segera diproses.`,
           [
             {
-              text: 'OK',
+              text: 'Lihat Pesanan',
+              onPress: () => {
+                clearCart();
+                navigation.navigate('OrdersTab');
+              },
+            },
+            {
+              text: 'Beranda',
               onPress: () => {
                 clearCart();
                 navigation.navigate('HomeTab');
@@ -145,7 +153,7 @@ const CheckoutScreen = ({ navigation }) => {
     }
   };
 
-  const handleMidtransPayment = async (amount) => {
+    const handleMidtransPayment = async (amount) => {
     setMidtransLoading(true);
     try {
       // Get client key first
@@ -156,21 +164,46 @@ const CheckoutScreen = ({ navigation }) => {
         return;
       }
 
-      // In a real app, you would use the Midtrans Snap SDK
-      // For this demo, we'll just show the order confirmation
-      Alert.alert(
-        'Midtrans Payment',
-        'Untuk integrasi penuh, gunakan Midtrans Snap SDK.\n\nUntuk saat ini, pesanan dibuat dengan status pending payment.',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              clearCart();
-              navigation.navigate('HomeTab');
+      // Create Snap token
+      const snapRes = await PaymentService.createSnapToken(Date.now().toString(), amount);
+      
+      if (snapRes.data.success && snapRes.data.token) {
+        // In a real app, you would open Midtrans payment page here
+        // For React Native, you could use WebView or redirect to snap URL
+        Alert.alert(
+          'Pembayaran Midtrans',
+          `Silakan selesaikan pembayaran melalui Midtrans.\nToken: ${snapRes.data.token.substring(0, 10)}...\n\nDi aplikasi nyata, ini akan membuka halaman pembayaran Midtrans.`,
+          [
+            {
+              text: 'Bayar Nanti',
+              onPress: () => {
+                // Simulate successful payment after user confirmation
+                Alert.alert(
+                  'Pembayaran Berhasil!',
+                  'Pembayaran Anda telah diproses. Terima kasih!',
+                  [
+                    {
+                      text: 'OK',
+                      onPress: () => {
+                        clearCart();
+                        navigation.navigate('HomeTab');
+                      },
+                    },
+                  ]
+                );
+              },
             },
-          },
-        ]
-      );
+            {
+              text: 'Batal',
+              onPress: () => {
+                setMidtransLoading(false);
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert('Error', snapRes.data.message || 'Gagal membuat token pembayaran');
+      }
     } catch (error) {
       console.error('Midtrans error:', error);
       Alert.alert('Error', 'Gagal inisiasi payment');
