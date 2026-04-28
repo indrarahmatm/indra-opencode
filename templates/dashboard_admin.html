@@ -6,23 +6,32 @@
 <div class="row mb-4">
     <div class="col-md-12">
         <div class="d-flex gap-2 flex-wrap">
-            <a href="{{ url_for('pesanan') }}" class="btn btn-entok">
-                <i class="bi bi-inbox"></i> Kelola Pesanan
-            </a>
-            <a href="{{ url_for('admin_sellers') }}" class="btn btn-success">
-                <i class="bi bi-shop"></i> Kelola Seller
-            </a>
+            <div class="dropdown">
+                <button class="btn btn-entok dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                    <i class="bi bi-inbox"></i> Kelola Pesanan & Laporan
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="{{ url_for('pesanan') }}">📦 Kelola Pesanan</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('laporan') }}">📊 Laporan Penjualan</a></li>
+                </ul>
+            </div>
+            <div class="dropdown">
+                <button class="btn btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                    <i class="bi bi-people"></i> Kelola User
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="{{ url_for('admin_users') }}">👥 Semua User</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('admin_sellers') }}">🏪 Kelola Seller</a></li>
+                </ul>
+            </div>
             <a href="{{ url_for('admin_categories') }}" class="btn btn-warning">
                 <i class="bi bi-tags"></i> Kelola Kategori
             </a>
             <a href="{{ url_for('admin_shipping') }}" class="btn btn-info text-white">
                 <i class="bi bi-truck"></i> Kelola Ongkir
-              </a>
-              <a href="/admin/payment" class="list-group-item list-group-item-action">
-                <i class="bi bi-credit-card"></i> Kelola Payment
             </a>
-            <a href="{{ url_for('laporan') }}" class="btn btn-outline-primary">
-                <i class="bi bi-graph-up"></i> Laporan
+            <a href="/admin/payment" class="btn btn-danger">
+                <i class="bi bi-credit-card"></i> Kelola Payment
             </a>
         </div>
     </div>

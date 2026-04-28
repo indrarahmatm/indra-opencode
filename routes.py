@@ -1661,6 +1661,45 @@ def admin_generate_app_key():
     return redirect(url_for('admin_shipping'))
 
 
+@app.route('/admin/users')
+@login_required
+def admin_users():
+    """Admin user management page - all users (buyers and sellers)"""
+    if current_user.role != 'admin':
+        flash('Unauthorized', 'error')
+        return redirect(url_for('index'))
+    
+    role_filter = request.args.get('role', '')
+    status_filter = request.args.get('status', '')
+    
+    query = User.query
+    
+    if role_filter:
+        query = query.filter_by(role=role_filter)
+    if status_filter == 'pending':
+        query = query.filter_by(is_approved=False)
+    elif status_filter == 'approved':
+        query = query.filter_by(is_approved=True)
+    
+    users = query.order_by(User.created_at.desc()).all()
+    
+    # Count statistics
+    total_users = User.query.count()
+    total_sellers = User.query.filter_by(role='peternak').count()
+    total_buyers = User.query.filter_by(role='buyer').count()
+    pending_approvals = User.query.filter_by(is_approved=False).count()
+    
+    return render_template('admin_users.html',
+                           title='Kelola User',
+                           users=users,
+                           role_filter=role_filter,
+                           status_filter=status_filter,
+                           total_users=total_users,
+                           total_sellers=total_sellers,
+                           total_buyers=total_buyers,
+                           pending_approvals=pending_approvals)
+
+
 @app.route('/admin/payment')
 @login_required
 def admin_payment():

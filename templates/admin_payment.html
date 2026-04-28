@@ -85,6 +85,7 @@
                     </div>
                     <div class="card-body">
                         <form method="POST" action="{{ url_for('admin_save_midtrans') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <div class="row">
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">Server Key</label>

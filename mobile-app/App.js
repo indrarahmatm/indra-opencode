@@ -17,6 +17,7 @@ import HomeScreen from './src/screens/HomeScreen';
 import ProductDetailScreen from './src/screens/ProductDetailScreen';
 import CategoriesScreen from './src/screens/CategoriesScreen';
 import CartScreen from './src/screens/CartScreen';
+import CheckoutScreen from './src/screens/CheckoutScreen';
 import OrdersScreen from './src/screens/OrdersScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 
@@ -63,6 +64,29 @@ function HomeStack() {
   );
 }
 
+// Cart Stack Navigator
+function CartStack() {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+      }}
+    >
+      <Stack.Screen name="CartMain" component={CartScreen} />
+      <Stack.Screen 
+        name="Checkout" 
+        component={CheckoutScreen}
+        options={{
+          headerShown: true,
+          title: 'Checkout',
+          headerStyle: { backgroundColor: COLORS.primary },
+          headerTintColor: '#FFFFFF',
+        }}
+      />
+    </Stack.Navigator>
+  );
+}
+
 // Main App with Tab Navigation
 function MainNavigator() {
   return (
@@ -100,12 +124,11 @@ function MainNavigator() {
       />
       <Tab.Screen
         name="CartTab"
-        component={CartScreen}
+        component={CartStack}
         options={{
           tabBarIcon: ({ focused }) => (
             <TabIcon icon="🛒" label="Keranjang" focused={focused} />
           ),
-          headerShown: false,
         }}
       />
       <Tab.Screen
