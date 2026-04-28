@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from flask import render_template, redirect, url_for, request, flash, send_from_directory, session, make_response, jsonify
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.utils import secure_filename
-from app import app, mail, db, csrf
+from app import app, mail, db, csrf, cache
 from models import User, Product, Order, OrderItem, Review, Wishlist, Category, ProductImage, Chat, ShippingCourier, ShippingZone, FreeShippingPromo, Setting
 from services.midtrans import (
     is_midtrans_enabled, create_snap_token, check_transaction_status,
@@ -2106,6 +2106,7 @@ def api_product_detail(product_id):
     }
 
 @app.route('/api/v1/categories')
+@cache.cached(timeout=300)
 def api_categories():
     """Get all categories (public)"""
     categories = Category.query.all()

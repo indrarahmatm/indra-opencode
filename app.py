@@ -5,6 +5,7 @@ from flask_mail import Mail
 from flask_wtf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_caching import Cache
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', os.urandom(32).hex())
@@ -43,6 +44,11 @@ app.config['RATELIMIT_STRATEGY'] = 'fixed-window'
 app.config['RATELIMIT_DEFAULT'] = '200 per day'
 app.config['RATELIMIT_HEADERS_ENABLED'] = True
 
+# Performance Optimization - Caching
+app.config['CACHE_TYPE'] = 'SimpleCache'  # In-memory cache
+app.config['CACHE_DEFAULT_TIMEOUT'] = 300  # 5 minutes default
+app.config['CACHE_THRESHOLD'] = 500  # Max 500 items cached
+
 mail = Mail(app)
 csrf = CSRFProtect(app)
 limiter = Limiter(
@@ -52,6 +58,9 @@ limiter = Limiter(
     storage_uri="memory://",
     enabled=False,
 )
+
+# Initialize cache
+cache = Cache(app)
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
